@@ -141,17 +141,19 @@ Notes:
 const SITEMAP_SYSTEM = `You are an expert local SEO strategist for medical clinic and aesthetics practice websites. You generate optimized sitemaps based on client data, marketing priorities, and local SEO best practices.
 
 Rules:
-- Fixed pages: Home (/), About (/about/), Contact (/contact/)
-- Service pages ranked by revenue priority and local search volume
+- Fixed pages always included: Home (/), About (/about/), Contact (/contact/)
+- Remaining pages ranked by revenue priority and local search volume
 - URL slugs: lowercase-hyphenated, service+city format where appropriate
 - Include rationale for each page
 - Flag upsell opportunities as additional pages beyond the core build
 - Return ONLY valid JSON, no markdown, no backticks`;
 
-const SITEMAP_USER = (clientData) => `Generate the optimal sitemap for this client.
+const SITEMAP_USER = (clientData, pageCount, feedback) => `Generate the optimal sitemap for this client.
 
 CLIENT:
 ${JSON.stringify(clientData, null, 2)}
+
+${feedback ? `FEEDBACK / SPECIAL INSTRUCTIONS:\n${feedback}\n` : ''}
 
 Return this structure:
 {
@@ -163,7 +165,7 @@ Return this structure:
   ]
 }
 
-Generate exactly 10 core pages. Then up to 8 additional pages as upsell opportunities.`;
+Generate exactly ${pageCount || 10} core pages. Then up to 8 additional pages as upsell opportunities.`;
 
 
 // ─── PAGE BRIEF BUILDER ───────────────────────────────────────────────────────

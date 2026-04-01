@@ -1,5 +1,5 @@
 // MMW Content Engine v2 — Server
-// Node.js, zero build step. Requires: @supabase/supabase-js
+// Node.js, zero build step. Requires: @supabase/supabase-js, docx
 
 const http = require('http');
 const fs = require('fs');
@@ -7,6 +7,10 @@ const path = require('path');
 const https = require('https');
 const zlib = require('zlib');
 const { createClient } = require('@supabase/supabase-js');
+const {
+  Document, Packer, Paragraph, TextRun, HeadingLevel,
+  AlignmentType, LevelFormat, BorderStyle, PageBreak
+} = require('docx');
 const {
   SYSTEM_PROMPT,
   SITEMAP_SYSTEM,
@@ -332,7 +336,7 @@ var server = http.createServer(async function (req, res) {
         model: 'claude-sonnet-4-20250514',
         max_tokens: 2000,
         system: SITEMAP_SYSTEM,
-        messages: [{ role: 'user', content: SITEMAP_USER(clientData) }]
+        messages: [{ role: 'user', content: SITEMAP_USER(clientData, body.pageCount, body.feedback) }]
       });
 
       if (result.status !== 200) return jsonErr(res, result.status, result.body.error?.message || 'API error');
@@ -385,8 +389,307 @@ var server = http.createServer(async function (req, res) {
     return;
   }
 
+  // ── Export single page as .docx ───────────────────────────────────────────
+  if (req.method === 'POST' && url === '/api/export/page') {
+    try {
+      var body = JSON.parse((await readBody(req)).toString());
+      var buffer = await buildPageDocx(body.page, body.clientName);
+      var filename = (body.clientName || 'page').replace(/\s+/g, '_') + '_' + (body.page.pageName || 'page').replace(/\s+/g, '_') + '.docx';
+      res.writeHead(200, {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'Content-Disposition': 'attachment; filename="' + filename + '"',
+        'Content-Length': buffer.length
+      });
+      res.end(buffer);
+    } catch (e) { jsonErr(res, 500, e.message); }
+    return;
+  }
+
+  // ── Export full package as .docx ──────────────────────────────────────────
+  if (req.method === 'POST' && url === '/api/export/package') {
+    try {
+      var body = JSON.parse((await readBody(req)).toString());
+      var buffer = await buildPackageDocx(body.pages, body.clientName, body.sitemap);
+      var filename = (body.clientName || 'client').replace(/\s+/g, '_') + '_full_package.docx';
+      res.writeHead(200, {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'Content-Disposition': 'attachment; filename="' + filename + '"',
+        'Content-Length': buffer.length
+      });
+      res.end(buffer);
+    } catch (e) { jsonErr(res, 500, e.message); }
+    return;
+  }
+
   res.writeHead(404); res.end('Not found');
 });
+
+// ─── DOCX BUILDER ─────────────────────────────────────────────────────────────
+
+function makeHeading(text, level) {
+  return new Paragraph({
+    heading: level,
+    children: [new TextRun({ text: String(text || ''), bold: true })]
+  });
+}
+
+function makeBody(text) {
+  return new Paragraph({
+    children: [new TextRun({ text: String(text || ''), size: 24 })]
+  });
+}
+
+function makeMeta(label, value) {
+  return new Paragraph({
+    children: [
+      new TextRun({ text: label + ': ', bold: true, size: 22 }),
+      new TextRun({ text: String(value || '—'), size: 22 })
+    ]
+  });
+}
+
+function makeRule() {
+  return new Paragraph({
+    border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'CCCCCC', space: 1 } },
+    children: [new TextRun('')]
+  });
+}
+
+function makeSpacer() {
+  return new Paragraph({ children: [new TextRun('')] });
+}
+
+function buildPageChildren(pageData, clientName) {
+  var children = [];
+  var c = pageData;
+
+  // Page header
+  children.push(makeHeading((c.pageName || 'Page') + ' — ' + (clientName || ''), HeadingLevel.HEADING_1));
+  children.push(makeSpacer());
+  children.push(makeMeta('URL', c.url));
+  children.push(makeMeta('Page title', c.pageTitle));
+  children.push(makeMeta('Meta description', c.metaDescription));
+  children.push(makeMeta('H1', c.h1));
+  children.push(makeMeta('Schema type', c.schemaType));
+  children.push(makeMeta('Tone', c.toneModifier));
+  children.push(makeRule());
+  children.push(makeSpacer());
+
+  // Layout sections
+  children.push(makeHeading('Layout and Copy', HeadingLevel.HEADING_2));
+  children.push(makeSpacer());
+
+  (c.layout || []).forEach(function (s) {
+    children.push(new Paragraph({
+      children: [
+        new TextRun({ text: '[' + s.order + '] ' + (s.sectionName || '') + ' ', bold: true, size: 24 }),
+        new TextRun({ text: '(' + (s.pattern || '') + ')', size: 22, color: '666666' })
+      ]
+    }));
+    if (s.headline) children.push(new Paragraph({
+      children: [new TextRun({ text: 'H2: ' + s.headline, bold: true, size: 26 })]
+    }));
+    if (s.subheadline) children.push(new Paragraph({
+      children: [new TextRun({ text: 'H3: ' + s.subheadline, italics: true, size: 24 })]
+    }));
+    if (s.body) {
+      s.body.split('\n').filter(Boolean).forEach(function (line) {
+        children.push(makeBody(line));
+      });
+    }
+    if (s.items && s.items.length) {
+      s.items.forEach(function (item) {
+        children.push(new Paragraph({
+          children: [new TextRun({ text: (item.heading || '') + ': ', bold: true, size: 24 }),
+                     new TextRun({ text: item.body || '', size: 24 })]
+        }));
+      });
+    }
+    if (s.cta) children.push(new Paragraph({
+      children: [new TextRun({ text: 'CTA: ' + (s.cta.label || '') + ' → ' + (s.cta.destination || ''), size: 22, color: '1a5ca8' })]
+    }));
+    if (s.notes) children.push(new Paragraph({
+      children: [new TextRun({ text: 'Build note: ' + s.notes, size: 20, italics: true, color: '888888' })]
+    }));
+    children.push(makeSpacer());
+  });
+
+  // AEO blocks
+  if (c.aeoBlocks && c.aeoBlocks.length) {
+    children.push(makeRule());
+    children.push(makeSpacer());
+    children.push(makeHeading('AEO Blocks', HeadingLevel.HEADING_2));
+    children.push(makeBody('These prose passages get embedded into the sections noted. Written for AI answer engines — do not format as Q&A on the page.'));
+    children.push(makeSpacer());
+    c.aeoBlocks.forEach(function (b) {
+      children.push(new Paragraph({
+        children: [new TextRun({ text: b.question || '', bold: true, size: 24 })]
+      }));
+      children.push(new Paragraph({
+        children: [new TextRun({ text: 'Place in: ' + (b.placedInSection || ''), size: 20, italics: true, color: '888888' })]
+      }));
+      children.push(makeBody(b.answer || ''));
+      children.push(makeSpacer());
+    });
+  }
+
+  // FAQ schema
+  if (c.faqSchema && c.faqSchema.length) {
+    children.push(makeRule());
+    children.push(makeSpacer());
+    children.push(makeHeading('FAQ Schema', HeadingLevel.HEADING_2));
+    children.push(makeBody('Visible FAQ accordion on page + JSON-LD structured data for Google rich results.'));
+    children.push(makeSpacer());
+    c.faqSchema.forEach(function (f) {
+      children.push(new Paragraph({
+        children: [new TextRun({ text: 'Q: ' + (f.q || ''), bold: true, size: 24 })]
+      }));
+      children.push(makeBody('A: ' + (f.a || '')));
+      children.push(makeSpacer());
+    });
+  }
+
+  // SEO notes
+  if (c.seoNotes) {
+    children.push(makeRule());
+    children.push(makeSpacer());
+    children.push(makeHeading('SEO Notes', HeadingLevel.HEADING_2));
+    children.push(makeBody(c.seoNotes));
+    children.push(makeSpacer());
+  }
+
+  // Gap flags
+  if (c.gapFlags && c.gapFlags.length) {
+    children.push(makeRule());
+    children.push(makeSpacer());
+    children.push(makeHeading('Gap Flags', HeadingLevel.HEADING_2));
+    c.gapFlags.forEach(function (g) {
+      children.push(new Paragraph({
+        children: [
+          new TextRun({ text: '[' + (g.section || '') + ']' + (g.blocksPublish ? ' — BLOCKS PUBLISH' : ''), bold: true, size: 24, color: g.blocksPublish ? 'cc0000' : 'b45309' })
+        ]
+      }));
+      children.push(makeBody('Missing: ' + (g.missing || '')));
+      children.push(new Paragraph({
+        children: [new TextRun({ text: 'Ask: "' + (g.requestLanguage || '') + '"', italics: true, size: 22 })]
+      }));
+      children.push(makeSpacer());
+    });
+  }
+
+  return children;
+}
+
+async function buildPageDocx(pageData, clientName) {
+  var doc = new Document({
+    styles: {
+      default: { document: { run: { font: 'Arial', size: 24 } } },
+      paragraphStyles: [
+        { id: 'Heading1', name: 'Heading 1', basedOn: 'Normal', next: 'Normal', quickFormat: true,
+          run: { size: 36, bold: true, font: 'Arial', color: '1a1a18' },
+          paragraph: { spacing: { before: 320, after: 160 }, outlineLevel: 0 } },
+        { id: 'Heading2', name: 'Heading 2', basedOn: 'Normal', next: 'Normal', quickFormat: true,
+          run: { size: 28, bold: true, font: 'Arial', color: '1a5ca8' },
+          paragraph: { spacing: { before: 240, after: 120 }, outlineLevel: 1 } },
+      ]
+    },
+    sections: [{
+      properties: {
+        page: {
+          size: { width: 12240, height: 15840 },
+          margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 }
+        }
+      },
+      children: buildPageChildren(pageData, clientName)
+    }]
+  });
+  return await Packer.toBuffer(doc);
+}
+
+async function buildPackageDocx(pages, clientName, sitemap) {
+  var allChildren = [];
+
+  // Cover
+  allChildren.push(makeHeading('MMW Content Engine — Full Package', HeadingLevel.HEADING_1));
+  allChildren.push(makeMeta('Client', clientName || ''));
+  allChildren.push(makeMeta('Generated', new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })));
+  allChildren.push(makeMeta('Pages', (pages || []).length + ''));
+  allChildren.push(makeSpacer());
+
+  // Sitemap summary
+  if (sitemap && sitemap.pages) {
+    allChildren.push(makeRule());
+    allChildren.push(makeSpacer());
+    allChildren.push(makeHeading('Sitemap', HeadingLevel.HEADING_2));
+    sitemap.pages.forEach(function (p) {
+      allChildren.push(new Paragraph({
+        children: [
+          new TextRun({ text: p.number + '. ' + p.name + ' ', bold: true, size: 24 }),
+          new TextRun({ text: '(' + p.url + ')', size: 22, color: '666666' })
+        ]
+      }));
+    });
+    allChildren.push(makeSpacer());
+  }
+
+  // Each page
+  (pages || []).forEach(function (p, i) {
+    if (!p.generated) return;
+    allChildren.push(new Paragraph({ children: [new PageBreak()] }));
+    buildPageChildren(p.generated, clientName).forEach(function (child) {
+      allChildren.push(child);
+    });
+  });
+
+  // Consolidated gap report
+  var allGaps = [];
+  (pages || []).forEach(function (p) {
+    if (!p.generated) return;
+    (p.generated.gapFlags || []).forEach(function (g) {
+      allGaps.push({ page: p.name, ...g });
+    });
+  });
+
+  if (allGaps.length) {
+    allChildren.push(new Paragraph({ children: [new PageBreak()] }));
+    allChildren.push(makeHeading('Consolidated Gap Report', HeadingLevel.HEADING_1));
+    allChildren.push(makeSpacer());
+    allGaps.forEach(function (g) {
+      allChildren.push(new Paragraph({
+        children: [new TextRun({ text: '[' + g.page + '] ' + (g.section || '') + (g.blocksPublish ? ' — BLOCKS PUBLISH' : ''), bold: true, size: 24, color: g.blocksPublish ? 'cc0000' : 'b45309' })]
+      }));
+      allChildren.push(makeBody('Missing: ' + (g.missing || '')));
+      allChildren.push(new Paragraph({
+        children: [new TextRun({ text: 'Ask: "' + (g.requestLanguage || '') + '"', italics: true, size: 22 })]
+      }));
+      allChildren.push(makeSpacer());
+    });
+  }
+
+  var doc = new Document({
+    styles: {
+      default: { document: { run: { font: 'Arial', size: 24 } } },
+      paragraphStyles: [
+        { id: 'Heading1', name: 'Heading 1', basedOn: 'Normal', next: 'Normal', quickFormat: true,
+          run: { size: 36, bold: true, font: 'Arial', color: '1a1a18' },
+          paragraph: { spacing: { before: 320, after: 160 }, outlineLevel: 0 } },
+        { id: 'Heading2', name: 'Heading 2', basedOn: 'Normal', next: 'Normal', quickFormat: true,
+          run: { size: 28, bold: true, font: 'Arial', color: '1a5ca8' },
+          paragraph: { spacing: { before: 240, after: 120 }, outlineLevel: 1 } },
+      ]
+    },
+    sections: [{
+      properties: {
+        page: {
+          size: { width: 12240, height: 15840 },
+          margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 }
+        }
+      },
+      children: allChildren
+    }]
+  });
+  return await Packer.toBuffer(doc);
+}
 
 server.listen(PORT, function () {
   console.log('\n  MMW Content Engine v2');

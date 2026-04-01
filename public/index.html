@@ -316,33 +316,62 @@ a { color: var(--accent); text-decoration: none; }
         <div class="notice notice-info">Review extracted data. Items marked Missing are gaps that will appear in the gap report.</div>
         <div class="card">
           <div class="card-title" id="parsedPracticeName">Client data</div>
-          <div class="card-sub">Confirm this is accurate before generating the sitemap.</div>
+          <div class="card-sub">Confirm this is accurate before setting sitemap options and generating.</div>
           <div class="parsed-grid" id="parsedGrid"></div>
-          <div style="margin-top:16px;display:flex;gap:10px;">
-            <button class="btn btn-primary" onclick="proceedToSitemap()">Generate sitemap</button>
-            <span id="sitemapGenStatus" style="font-size:13px;color:var(--muted);align-self:center;"></span>
+          <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+            <div style="font-size:13px;font-weight:500;margin-bottom:12px;">Sitemap options</div>
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+              <label class="form-label" style="margin-bottom:0;white-space:nowrap">Number of pages</label>
+              <input type="number" id="pageCountInput" value="10" min="3" max="50" class="form-input" style="width:80px">
+              <span style="font-size:12px;color:var(--muted)">Standard builds: 10. Large sites: up to 50.</span>
+            </div>
+            <div style="margin-bottom:14px;">
+              <label class="form-label" style="display:block;margin-bottom:6px">Special instructions (optional)</label>
+              <textarea id="sitemapFeedbackInput" class="regen-textarea" placeholder="e.g. Include a dedicated Devices page. Remove PRP Hair Restoration. Add a Before &amp; After Gallery." style="width:100%;min-height:60px;"></textarea>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;">
+              <button class="btn btn-primary" id="genSitemapBtn" onclick="proceedToSitemap()">Generate sitemap</button>
+              <span id="sitemapGenStatus" style="font-size:13px;color:var(--muted);"></span>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Stage 3: Sitemap -->
       <div id="stage-3" style="display:none">
-        <div class="notice notice-info">Review the recommended sitemap. Approve to begin copy generation.</div>
-        <div class="card">
-          <div class="card-title" id="sitemapTitle">Sitemap</div>
-          <div class="card-sub">10-page standard build, ranked by local SEO and revenue priority.</div>
-          <table class="sitemap-table">
-            <thead><tr><th>#</th><th>Page</th><th>URL</th><th>Type</th><th>Rationale</th></tr></thead>
-            <tbody id="sitemapBody"></tbody>
-          </table>
-          <div class="add-pages-title">Recommended additional pages (upsell opportunities)</div>
-          <table class="sitemap-table">
-            <thead><tr><th>Priority</th><th>Page</th><th>URL</th><th>Value</th><th>Rationale</th></tr></thead>
-            <tbody id="addPagesBody"></tbody>
-          </table>
-          <div style="margin-top:20px;display:flex;gap:10px;">
-            <button class="btn btn-primary" onclick="approveAndGenerate()">Approve and generate copy</button>
-            <button class="btn" onclick="exportSitemap()">Download sitemap</button>
+
+        <!-- Sitemap result -->
+        <div id="sitemapResultWrap">
+          <div class="card" style="margin-bottom:14px;">
+            <div class="card-title" style="font-size:13px;margin-bottom:8px;">Regenerate with feedback</div>
+            <div style="display:flex;gap:10px;align-items:flex-start;">
+              <textarea id="sitemapRegenFeedback" class="regen-textarea" placeholder='e.g. Replace PRP Hair Restoration with a Devices We Use page. Add Before &amp; After Gallery as page 9.' style="flex:1;min-height:56px;"></textarea>
+              <button class="btn" onclick="regenerateSitemap()" style="flex-shrink:0;margin-top:2px;">Regenerate</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:8px;">
+              <div>
+                <div class="card-title" id="sitemapTitle">Sitemap</div>
+                <div class="card-sub" id="sitemapSubtitle" style="margin-bottom:0">Click any cell to edit directly.</div>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-sm" onclick="addSitemapRow()">+ Add page</button>
+                <button class="btn btn-sm" onclick="exportSitemap()">Download</button>
+                <button class="btn btn-primary btn-sm" onclick="approveAndGenerate()">Approve and generate copy</button>
+              </div>
+            </div>
+            <table class="sitemap-table" style="margin-top:14px">
+              <thead><tr><th style="width:32px"></th><th style="width:28px">#</th><th>Page name</th><th>URL</th><th style="width:90px">Type</th><th>Rationale</th><th style="width:36px"></th></tr></thead>
+              <tbody id="sitemapBody"></tbody>
+            </table>
+
+            <div class="add-pages-title">Recommended additional pages (upsell opportunities)</div>
+            <table class="sitemap-table">
+              <thead><tr><th>Priority</th><th>Page</th><th>URL</th><th>Value</th><th>Rationale</th></tr></thead>
+              <tbody id="addPagesBody"></tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -415,6 +444,24 @@ a { color: var(--accent); text-decoration: none; }
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('newProjectModal')">Cancel</button>
       <button class="btn btn-primary" onclick="createProject()">Create project</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete project modal -->
+<div class="modal-overlay" id="deleteProjectModal">
+  <div class="modal">
+    <div class="modal-title">Delete project</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:16px;">This permanently deletes the project and all generated content. Type the client name to confirm.</div>
+    <div style="font-size:13px;font-weight:500;margin-bottom:8px;" id="deleteProjectName"></div>
+    <div class="form-group">
+      <label class="form-label">Type client name to confirm</label>
+      <input class="form-input" id="deleteConfirmInput" placeholder="" onkeydown="if(event.key==='Enter')confirmDelete()">
+    </div>
+    <div class="error-msg" id="deleteError" style="display:none">Name does not match. Please try again.</div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('deleteProjectModal')">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmDelete()">Delete project</button>
     </div>
   </div>
 </div>
@@ -540,10 +587,13 @@ function renderProjects(projects) {
   var grid = document.getElementById('projectGrid');
   var html = projects.map(function (p) {
     var date = new Date(p.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    return '<div class="project-card" onclick="openProject(\'' + p.id + '\')">' +
+    return '<div class="project-card" onclick="openProject(\'' + p.id + '\')" style="position:relative">' +
       '<div class="project-card-name">' + esc(p.client_name) + '</div>' +
       '<div class="project-card-meta">' + esc(p.build_type) + ' &nbsp;·&nbsp; Updated ' + date + '</div>' +
       '<span class="status-pill status-' + p.status + '">' + (p.status === 'complete' ? 'Complete' : 'In progress') + '</span>' +
+      '<button onclick="event.stopPropagation();openDeleteModal(\'' + p.id + '\',\'' + p.client_name.replace(/'/g,"\\'") + '\')" ' +
+        'style="position:absolute;top:10px;right:10px;background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted2);padding:2px 6px;border-radius:4px;" ' +
+        'title="Delete project" onmouseover="this.style.color=\'var(--danger)\'" onmouseout="this.style.color=\'var(--muted2)\'">&times;</button>' +
       '</div>';
   }).join('');
   html += '<div class="project-card new-project-card" onclick="openNewProjectModal()">' +
@@ -583,6 +633,7 @@ async function openProject(id) {
       restoreStage(4);
     } else if (S.sitemap) {
       restoreStage(3);
+      renderSitemap(S.sitemap);
     } else if (S.parsedData) {
       restoreStage(2);
       renderParsedData(S.parsedData);
@@ -643,11 +694,13 @@ async function handleUpload(input) {
     var data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Parse failed');
     S.parsedData = data.parsed;
-    // Save to project
-    await api('PUT', '/api/projects/' + S.currentProject.id, {
-      parsedData: S.parsedData,
-      masterRecordRaw: S.masterRecordRaw
-    });
+    // Save to project if one is open
+    if (S.currentProject && S.currentProject.id) {
+      await api('PUT', '/api/projects/' + S.currentProject.id, {
+        parsedData: S.parsedData,
+        masterRecordRaw: S.masterRecordRaw
+      });
+    }
     status.textContent = 'Parsed successfully.';
     renderParsedData(S.parsedData);
     goToStage(2);
@@ -687,12 +740,14 @@ function renderParsedData(d) {
 
 // ─── SITEMAP ──────────────────────────────────────────────────────────────────
 async function proceedToSitemap() {
-  var btn = event.target;
+  var btn = document.getElementById('genSitemapBtn');
   var status = document.getElementById('sitemapGenStatus');
+  var pageCount = parseInt(document.getElementById('pageCountInput').value) || 10;
+  var feedback = document.getElementById('sitemapFeedbackInput').value.trim();
   btn.disabled = true;
   status.innerHTML = '<span class="spinner"></span> Generating sitemap...';
   try {
-    var sitemap = await api('POST', '/api/sitemap', { clientData: S.parsedData });
+    var sitemap = await api('POST', '/api/sitemap', { clientData: S.parsedData, pageCount: pageCount, feedback: feedback });
     S.sitemap = sitemap;
     await api('PUT', '/api/projects/' + S.currentProject.id, { sitemap: S.sitemap });
     renderSitemap(sitemap);
@@ -702,23 +757,107 @@ async function proceedToSitemap() {
     status.textContent = 'Error: ' + e.message;
   }
   btn.disabled = false;
+  status.innerHTML = '';
+}
+
+async function regenerateSitemap() {
+  var feedback = document.getElementById('sitemapRegenFeedback').value.trim();
+  var pageCount = S.sitemap && S.sitemap.pages ? S.sitemap.pages.length : 10;
+  var btn = event.target;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  try {
+    // Snapshot current edits before regenerating
+    syncSitemapEdits();
+    var sitemap = await api('POST', '/api/sitemap', { clientData: S.parsedData, pageCount: pageCount, feedback: feedback });
+    S.sitemap = sitemap;
+    await api('PUT', '/api/projects/' + S.currentProject.id, { sitemap: S.sitemap });
+    renderSitemap(sitemap);
+    document.getElementById('sitemapRegenFeedback').value = '';
+  } catch (e) { alert('Regeneration failed: ' + e.message); }
+  btn.disabled = false;
+  btn.textContent = 'Regenerate';
+}
+
+// Read current editable table back into S.sitemap.pages
+function syncSitemapEdits() {
+  var rows = document.querySelectorAll('#sitemapBody tr[data-idx]');
+  rows.forEach(function(row) {
+    var idx = parseInt(row.getAttribute('data-idx'));
+    var cells = row.querySelectorAll('td[contenteditable]');
+    if (S.sitemap.pages[idx]) {
+      S.sitemap.pages[idx].name = cells[0] ? cells[0].textContent.trim() : S.sitemap.pages[idx].name;
+      S.sitemap.pages[idx].url = cells[1] ? cells[1].textContent.trim() : S.sitemap.pages[idx].url;
+      S.sitemap.pages[idx].rationale = cells[2] ? cells[2].textContent.trim() : S.sitemap.pages[idx].rationale;
+      var sel = row.querySelector('select');
+      if (sel) S.sitemap.pages[idx].type = sel.value;
+    }
+  });
+  // Renumber
+  S.sitemap.pages.forEach(function(p, i) { p.number = i + 1; });
 }
 
 function renderSitemap(sitemap) {
   document.getElementById('sitemapTitle').textContent = 'Sitemap — ' + (S.parsedData.practiceName || 'Client');
-  document.getElementById('sitemapBody').innerHTML = (sitemap.pages || []).map(function (p) {
-    var typeClass = p.type === 'core' ? 'type-core' : p.type === 'service' ? 'type-service' : 'type-support';
-    return '<tr><td>' + p.number + '</td><td><strong>' + esc(p.name) + '</strong></td><td style="font-family:monospace;font-size:12px">' + esc(p.url) + '</td>' +
-      '<td><span class="type-badge ' + typeClass + '">' + esc(p.type) + '</span></td><td style="font-size:12px;color:var(--muted)">' + esc(p.rationale || '') + '</td></tr>';
+  document.getElementById('sitemapSubtitle').textContent = sitemap.pages.length + '-page build. Click any cell to edit directly.';
+  document.getElementById('sitemapBody').innerHTML = (sitemap.pages || []).map(function (p, i) {
+    return '<tr data-idx="' + i + '">' +
+      '<td style="cursor:grab;color:var(--muted2);text-align:center">=</td>' +
+      '<td style="color:var(--muted2);font-size:12px">' + (i+1) + '</td>' +
+      '<td contenteditable="true" style="font-weight:500;min-width:140px" onblur="syncSitemapEdits()">' + esc(p.name) + '</td>' +
+      '<td contenteditable="true" style="font-family:monospace;font-size:12px;min-width:160px" onblur="syncSitemapEdits()">' + esc(p.url) + '</td>' +
+      '<td><select onchange="syncSitemapEdits()" style="font-size:12px;border:1px solid var(--border);border-radius:4px;padding:2px 4px;background:var(--surface)">' +
+        '<option value="core"' + (p.type==='core'?' selected':'') + '>core</option>' +
+        '<option value="service"' + (p.type==='service'?' selected':'') + '>service</option>' +
+        '<option value="support"' + (p.type==='support'?' selected':'') + '>support</option>' +
+      '</select></td>' +
+      '<td contenteditable="true" style="font-size:12px;color:var(--muted)" onblur="syncSitemapEdits()">' + esc(p.rationale || '') + '</td>' +
+      '<td><button onclick="deleteSitemapRow(' + i + ')" style="background:none;border:none;cursor:pointer;color:var(--muted2);font-size:16px;padding:2px 6px;" title="Remove">×</button></td>' +
+      '</tr>';
   }).join('');
   document.getElementById('addPagesBody').innerHTML = (sitemap.additionalPages || []).map(function (p) {
     var val = p.value === 'high' ? 'success' : p.value === 'medium' ? 'warn' : 'muted';
-    return '<tr><td>' + p.priority + '</td><td>' + esc(p.name) + '</td><td style="font-family:monospace;font-size:12px">' + esc(p.url) + '</td>' +
-      '<td><span style="color:var(--' + val + ')">' + esc(p.value || '') + '</span></td><td style="font-size:12px;color:var(--muted)">' + esc(p.rationale || '') + '</td></tr>';
+    return '<tr><td>' + p.priority + '</td><td>' + esc(p.name) + '</td>' +
+      '<td style="font-family:monospace;font-size:12px">' + esc(p.url) + '</td>' +
+      '<td><span style="color:var(--' + val + ')">' + esc(p.value || '') + '</span></td>' +
+      '<td style="font-size:12px;color:var(--muted)">' + esc(p.rationale || '') + '</td>' +
+      '<td><button onclick="promoteAdditionalPage(' + p.priority + ')" class="btn btn-sm" style="font-size:11px;padding:2px 8px;">Add to sitemap</button></td></tr>';
   }).join('');
 }
 
+function deleteSitemapRow(idx) {
+  syncSitemapEdits();
+  S.sitemap.pages.splice(idx, 1);
+  S.sitemap.pages.forEach(function(p, i) { p.number = i + 1; });
+  renderSitemap(S.sitemap);
+}
+
+function addSitemapRow() {
+  syncSitemapEdits();
+  var num = S.sitemap.pages.length + 1;
+  S.sitemap.pages.push({ number: num, name: 'New Page', url: '/new-page/', type: 'service', rationale: '' });
+  renderSitemap(S.sitemap);
+  // Focus the new row name cell
+  var rows = document.querySelectorAll('#sitemapBody tr[data-idx]');
+  var lastRow = rows[rows.length - 1];
+  if (lastRow) {
+    var cell = lastRow.querySelector('td[contenteditable]');
+    if (cell) { cell.focus(); document.execCommand('selectAll', false, null); }
+  }
+}
+
+function promoteAdditionalPage(priority) {
+  syncSitemapEdits();
+  var page = (S.sitemap.additionalPages || []).find(function(p) { return p.priority === priority; });
+  if (!page) return;
+  var num = S.sitemap.pages.length + 1;
+  S.sitemap.pages.push({ number: num, name: page.name, url: page.url, type: page.type || 'service', rationale: page.rationale });
+  S.sitemap.additionalPages = S.sitemap.additionalPages.filter(function(p) { return p.priority !== priority; });
+  renderSitemap(S.sitemap);
+}
+
 function exportSitemap() {
+  syncSitemapEdits();
   if (!S.sitemap) return;
   var lines = ['SITEMAP — ' + (S.parsedData.practiceName || 'Client'), '='.repeat(50), ''];
   (S.sitemap.pages || []).forEach(function (p) {
@@ -738,6 +877,9 @@ function exportSitemap() {
 
 // ─── GENERATION ───────────────────────────────────────────────────────────────
 async function approveAndGenerate() {
+  syncSitemapEdits();
+  // Save final sitemap edits before generating
+  await api('PUT', '/api/projects/' + S.currentProject.id, { sitemap: S.sitemap });
   goToStage(4);
   S.pages = S.sitemap.pages.map(function (p) { return { ...p, generated: null }; });
   renderPagesList();
@@ -987,36 +1129,52 @@ function renderExportGrid() {
   goToStage(5);
 }
 
-function downloadPage(i) {
+async function downloadPage(i) {
   var page = S.pages[i];
   if (!page || !page.generated) return;
-  var lines = buildPageText(page.generated);
-  downloadAsDocx(lines, (S.parsedData.practiceName || 'client').replace(/\s+/g, '_') + '_' + page.name.replace(/\s+/g, '_') + '.txt');
+  var btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Building...';
+  try {
+    var res = await fetch('/api/export/page', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + S.token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ page: page.generated, clientName: S.parsedData.practiceName || 'Client' })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    var blob = await res.blob();
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (S.parsedData.practiceName || 'client').replace(/\s+/g,'_') + '_' + (page.name || 'page').replace(/\s+/g,'_') + '.docx';
+    a.click();
+  } catch(e) { alert('Export failed: ' + e.message); }
+  btn.disabled = false;
+  btn.textContent = 'Download .docx';
 }
 
-function downloadFullPackage() {
-  var allLines = ['MMW CONTENT ENGINE — FULL PACKAGE', '='.repeat(60),
-    'Client: ' + (S.parsedData.practiceName || ''), 'Generated: ' + new Date().toLocaleDateString(), '', ''];
-  S.pages.forEach(function (p) {
-    if (!p.generated) return;
-    allLines.push('='.repeat(60));
-    allLines.push('PAGE: ' + p.name + ' (' + p.url + ')');
-    allLines.push('='.repeat(60));
-    allLines = allLines.concat(buildPageText(p.generated));
-    allLines.push('');
-  });
-  allLines.push('='.repeat(60));
-  allLines.push('CONSOLIDATED GAP REPORT');
-  allLines.push('='.repeat(60));
-  S.pages.forEach(function (p) {
-    if (!p.generated) return;
-    (p.generated.gapFlags || []).forEach(function (g) {
-      allLines.push('[' + p.name + '] ' + g.section + ': ' + g.missing + (g.blocksPublish ? ' [BLOCKS PUBLISH]' : ''));
-      allLines.push('Ask: "' + g.requestLanguage + '"');
-      allLines.push('');
+async function downloadFullPackage() {
+  var btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Building package...';
+  try {
+    var res = await fetch('/api/export/package', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + S.token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pages: S.pages,
+        clientName: S.parsedData.practiceName || 'Client',
+        sitemap: S.sitemap
+      })
     });
-  });
-  downloadAsDocx(allLines, (S.parsedData.practiceName || 'client').replace(/\s+/g, '_') + '_full_package.txt');
+    if (!res.ok) throw new Error(await res.text());
+    var blob = await res.blob();
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (S.parsedData.practiceName || 'client').replace(/\s+/g,'_') + '_full_package.docx';
+    a.click();
+  } catch(e) { alert('Export failed: ' + e.message); }
+  btn.disabled = false;
+  btn.textContent = 'Download full package (.docx)';
 }
 
 function downloadGapReport() {
@@ -1096,6 +1254,35 @@ function dl(content, filename) {
 // ─── MODAL HELPERS ────────────────────────────────────────────────────────────
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ─── DELETE PROJECT ───────────────────────────────────────────────────────────
+var deleteTargetId = null;
+var deleteTargetName = null;
+
+function openDeleteModal(id, name) {
+  deleteTargetId = id;
+  deleteTargetName = name;
+  document.getElementById('deleteProjectName').textContent = name;
+  document.getElementById('deleteConfirmInput').value = '';
+  document.getElementById('deleteError').style.display = 'none';
+  openModal('deleteProjectModal');
+  setTimeout(function() { document.getElementById('deleteConfirmInput').focus(); }, 100);
+}
+
+async function confirmDelete() {
+  var input = document.getElementById('deleteConfirmInput').value.trim();
+  var errEl = document.getElementById('deleteError');
+  if (input.toLowerCase() !== deleteTargetName.toLowerCase()) {
+    errEl.style.display = 'block';
+    return;
+  }
+  errEl.style.display = 'none';
+  try {
+    await api('DELETE', '/api/projects/' + deleteTargetId);
+    closeModal('deleteProjectModal');
+    loadProjects();
+  } catch(e) { alert('Delete failed: ' + e.message); }
+}
 
 // ─── UTILS ────────────────────────────────────────────────────────────────────
 function esc(s) {
