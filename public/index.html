@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MMW Content Engine</title>
+<style>
+:root {
+  --bg: #f9f8f6;
+  --surface: #ffffff;
+  --surface2: #f3f2ef;
+  --border: #e4e2dc;
+  --border2: #d0cec8;
+  --text: #1a1a18;
+  --muted: #6b6a65;
+  --muted2: #9b9a95;
+  --accent: #1a5ca8;
+  --accent-bg: #e8f0fb;
+  --warn: #b45309;
+  --warn-bg: #fef3c7;
+  --success: #166534;
+  --success-bg: #dcfce7;
+  --danger: #991b1b;
+  --danger-bg: #fee2e2;
+  --radius: 8px;
+  --radius-lg: 12px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.6; }
+a { color: var(--accent); text-decoration: none; }
+
+/* ── Layout ── */
+.app { display: flex; flex-direction: column; min-height: 100vh; }
+.topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; height: 52px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+.topbar-brand { font-weight: 600; font-size: 15px; letter-spacing: -0.3px; }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.user-badge { font-size: 12px; color: var(--muted); }
+.main { flex: 1; }
+
+/* ── Screens ── */
+.screen { display: none; }
+.screen.active { display: block; }
+
+/* ── Login ── */
+.login-wrap { max-width: 380px; margin: 80px auto; padding: 0 16px; }
+.login-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 32px; }
+.login-title { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+.login-sub { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+.form-group { margin-bottom: 16px; }
+.form-label { display: block; font-size: 12px; font-weight: 500; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+.form-input { width: 100%; padding: 9px 12px; border: 1px solid var(--border2); border-radius: var(--radius); font-size: 14px; background: var(--surface); color: var(--text); outline: none; transition: border-color 0.15s; }
+.form-input:focus { border-color: var(--accent); }
+.error-msg { color: var(--danger); font-size: 12px; margin-top: 8px; }
+
+/* ── Buttons ── */
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--radius); font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid var(--border2); background: var(--surface); color: var(--text); transition: all 0.15s; white-space: nowrap; }
+.btn:hover { background: var(--surface2); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-primary:hover { background: #1550a0; }
+.btn-danger { background: var(--danger-bg); color: var(--danger); border-color: #fca5a5; }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+.btn-full { width: 100%; justify-content: center; }
+
+/* ── Projects screen ── */
+.projects-wrap { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
+.projects-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+.projects-title { font-size: 20px; font-weight: 600; }
+.project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.project-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; }
+.project-card:hover { border-color: var(--border2); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.project-card-name { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+.project-card-meta { font-size: 12px; color: var(--muted); }
+.status-pill { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 500; margin-top: 8px; }
+.status-in_progress { background: var(--accent-bg); color: var(--accent); }
+.status-complete { background: var(--success-bg); color: var(--success); }
+.new-project-card { border: 1px dashed var(--border2); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8px; color: var(--muted); font-size: 13px; min-height: 120px; }
+.new-project-card:hover { border-color: var(--accent); color: var(--accent); }
+.plus-icon { font-size: 24px; line-height: 1; }
+
+/* ── Modal ── */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200; align-items: center; justify-content: center; }
+.modal-overlay.open { display: flex; }
+.modal { background: var(--surface); border-radius: var(--radius-lg); padding: 28px; width: 440px; max-width: 95vw; }
+.modal-title { font-size: 17px; font-weight: 600; margin-bottom: 20px; }
+.modal-actions { display: flex; gap: 10px; margin-top: 24px; justify-content: flex-end; }
+
+/* ── Workflow ── */
+.workflow-wrap { max-width: 900px; margin: 0 auto; padding: 24px; }
+.workflow-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+.back-btn { color: var(--muted); font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+.back-btn:hover { color: var(--text); }
+.workflow-client { font-size: 18px; font-weight: 600; }
+.workflow-status { font-size: 12px; color: var(--muted); }
+
+/* Stage pills */
+.stage-bar { display: flex; gap: 6px; margin-bottom: 24px; flex-wrap: wrap; }
+.stage-pill { font-size: 12px; padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); font-weight: 500; }
+.stage-pill.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.stage-pill.done { background: var(--success-bg); border-color: #86efac; color: var(--success); }
+
+/* Cards */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 22px; margin-bottom: 16px; }
+.card-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.card-sub { font-size: 13px; color: var(--muted); margin-bottom: 16px; }
+.notice { padding: 12px 16px; border-radius: var(--radius); font-size: 13px; margin-bottom: 16px; }
+.notice-info { background: var(--accent-bg); color: var(--accent); }
+.notice-ok { background: var(--success-bg); color: var(--success); }
+.notice-warn { background: var(--warn-bg); color: var(--warn); }
+
+/* Parsed data grid */
+.parsed-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.pfield { background: var(--surface2); border-radius: var(--radius); padding: 10px 12px; }
+.pfield-key { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted2); font-weight: 500; margin-bottom: 3px; }
+.pfield-val { font-size: 13px; color: var(--text); }
+.pfield-val.gap { color: var(--warn); }
+.gap-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; background: var(--warn-bg); color: var(--warn); padding: 2px 6px; border-radius: 4px; font-weight: 500; }
+
+/* Sitemap table */
+.sitemap-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 12px; }
+.sitemap-table th { text-align: left; padding: 8px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted2); border-bottom: 1px solid var(--border); }
+.sitemap-table td { padding: 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.sitemap-table tr:last-child td { border-bottom: none; }
+.type-badge { font-size: 11px; padding: 2px 7px; border-radius: 12px; font-weight: 500; }
+.type-core { background: var(--accent-bg); color: var(--accent); }
+.type-service { background: #f3e8ff; color: #6b21a8; }
+.type-support { background: var(--surface2); color: var(--muted); }
+.add-pages-title { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 20px 0 10px; }
+
+/* Pages list */
+.page-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; cursor: pointer; transition: border-color 0.15s; }
+.page-row:hover { border-color: var(--border2); }
+.page-row.active-page { border-color: var(--accent); background: var(--accent-bg); }
+.pr-name { font-weight: 500; font-size: 14px; }
+.pr-url { font-size: 12px; color: var(--muted); }
+.pr-status { font-size: 12px; padding: 3px 9px; border-radius: 12px; font-weight: 500; margin-left: auto; white-space: nowrap; }
+.s-q { background: var(--surface2); color: var(--muted); }
+.s-g { background: var(--warn-bg); color: var(--warn); }
+.s-done { background: var(--success-bg); color: var(--success); }
+.s-gap { background: var(--warn-bg); color: var(--warn); }
+.s-err { background: var(--danger-bg); color: var(--danger); }
+.spinner { display: inline-block; width: 10px; height: 10px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Page viewer */
+.viewer-wrap { margin-top: 16px; display: none; }
+.viewer-wrap.open { display: block; }
+.viewer-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+.vtab { font-size: 13px; padding: 8px 14px; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.vtab.active { color: var(--text); border-bottom-color: var(--text); font-weight: 500; }
+
+/* Layout map */
+.layout-map { display: flex; flex-direction: column; gap: 6px; }
+.lm-row { display: flex; align-items: stretch; gap: 8px; }
+.lm-num { font-size: 11px; color: var(--muted2); width: 18px; padding-top: 10px; text-align: right; flex-shrink: 0; }
+.lm-card { flex: 1; border: 1px solid var(--border); border-radius: var(--radius); padding: 9px 12px; background: var(--surface); display: flex; align-items: center; gap: 10px; }
+.pattern-pill { font-size: 10px; font-weight: 500; padding: 2px 8px; border-radius: 12px; white-space: nowrap; }
+.lm-name { font-size: 13px; font-weight: 500; flex: 1; }
+.lm-preview { font-size: 11px; color: var(--muted); flex: 2; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.regen-btn { font-size: 11px; padding: 3px 8px; border: 1px solid var(--border2); border-radius: 6px; background: var(--surface2); cursor: pointer; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
+.regen-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Section copy viewer */
+.section-block { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+.section-block:last-child { border-bottom: none; }
+.section-label { font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted2); margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; }
+.section-headline { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.section-sub { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+.section-body { font-size: 14px; line-height: 1.8; }
+.section-items { margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+.section-item { border-left: 2px solid var(--border2); padding: 8px 12px; }
+.section-item-h { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.section-item-b { font-size: 13px; line-height: 1.7; }
+.section-cta { display: inline-block; font-size: 12px; margin-top: 8px; padding: 5px 12px; border: 1px solid var(--border2); border-radius: var(--radius); color: var(--muted); }
+.section-note { font-size: 11px; color: var(--muted2); font-style: italic; margin-top: 8px; padding: 6px 10px; background: var(--surface2); border-radius: 6px; }
+.gap-inline { background: var(--warn-bg); color: var(--warn); padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+
+/* SEO/AEO viewer */
+.seo-row { margin-bottom: 14px; }
+.seo-key { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted2); font-weight: 500; margin-bottom: 4px; }
+.seo-val { font-size: 13px; line-height: 1.6; }
+.aeo-block { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 8px; }
+.aeo-q { font-size: 11px; font-weight: 500; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+.aeo-placed { font-size: 10px; color: var(--muted2); margin-bottom: 6px; }
+.aeo-a { font-size: 13px; line-height: 1.7; }
+.faq-item { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.faq-item:last-child { border-bottom: none; }
+.faq-q { font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+.faq-a { font-size: 13px; color: var(--muted); line-height: 1.65; }
+.mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; background: var(--surface2); padding: 12px; border-radius: var(--radius); white-space: pre-wrap; overflow-x: auto; border: 1px solid var(--border); line-height: 1.55; }
+
+/* Gap flags */
+.gap-item { border-left: 3px solid var(--warn); padding: 10px 14px; margin-bottom: 10px; background: var(--surface2); border-radius: 0 var(--radius) var(--radius) 0; }
+.gap-item.blocker { border-left-color: var(--danger); }
+.gap-sec { font-size: 11px; color: var(--muted2); margin-bottom: 3px; }
+.gap-missing { font-size: 13px; margin-bottom: 5px; }
+.gap-req { font-size: 12px; color: var(--muted); font-style: italic; }
+.no-gaps { text-align: center; padding: 20px; color: var(--success); font-size: 13px; background: var(--success-bg); border-radius: var(--radius); }
+
+/* Export */
+.dl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.dl-card { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 6px; }
+.dl-name { font-size: 13px; font-weight: 500; }
+.dl-meta { font-size: 11px; color: var(--muted2); }
+.progress-bar { height: 4px; background: var(--border); border-radius: 2px; margin-bottom: 16px; overflow: hidden; }
+.progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.4s; }
+
+/* Pattern colors */
+.p-hero { background: #dbeafe; color: #1e40af; }
+.p-intro { background: #dcfce7; color: #166534; }
+.p-cards { background: #ede9fe; color: #5b21b6; }
+.p-grid { background: #fef9c3; color: #854d0e; }
+.p-three { background: #ccfbf1; color: #134e4a; }
+.p-two { background: #fce7f3; color: #831843; }
+.p-loc { background: #f1f5f9; color: #334155; }
+.p-test { background: #ffedd5; color: #7c2d12; }
+.p-cta { background: #dbeafe; color: #1e40af; }
+.p-comp { background: #fee2e2; color: #991b1b; }
+.p-other { background: var(--surface2); color: var(--muted); }
+
+/* Regen feedback modal */
+.regen-modal { background: var(--surface); border-radius: var(--radius-lg); padding: 24px; width: 480px; max-width: 95vw; }
+.regen-textarea { width: 100%; padding: 9px 12px; border: 1px solid var(--border2); border-radius: var(--radius); font-size: 13px; background: var(--surface); color: var(--text); outline: none; resize: vertical; min-height: 80px; font-family: inherit; }
+.regen-textarea:focus { border-color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- Top bar -->
+<div class="topbar">
+  <div class="topbar-brand">MMW Content Engine</div>
+  <div class="topbar-right">
+    <span class="user-badge" id="userBadge"></span>
+    <button class="btn btn-sm" id="logoutBtn" style="display:none" onclick="logout()">Sign out</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- ── SCREEN: Login ── -->
+  <div class="screen active" id="screen-login">
+    <div class="login-wrap">
+      <div class="login-card">
+        <div class="login-title">Sign in</div>
+        <div class="login-sub">Medical Marketing Whiz internal tool</div>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input class="form-input" type="email" id="loginEmail" placeholder="you@medicalmarketingwhiz.com" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input class="form-input" type="password" id="loginPassword" placeholder="" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <div class="error-msg" id="loginError" style="display:none"></div>
+        <div style="margin-top:20px">
+          <button class="btn btn-primary btn-full" id="loginBtn" onclick="doLogin()">Sign in</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SCREEN: Projects ── -->
+  <div class="screen" id="screen-projects">
+    <div class="projects-wrap">
+      <div class="projects-header">
+        <div class="projects-title">Projects</div>
+        <button class="btn btn-primary" onclick="openNewProjectModal()">+ New project</button>
+      </div>
+      <div class="project-grid" id="projectGrid">
+        <div style="color:var(--muted);font-size:13px;grid-column:1/-1">Loading projects...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SCREEN: Workflow ── -->
+  <div class="screen" id="screen-workflow">
+    <div class="workflow-wrap">
+
+      <div class="workflow-header">
+        <span class="back-btn" onclick="goToProjects()">← Projects</span>
+        <div>
+          <div class="workflow-client" id="wfClientName"></div>
+          <div class="workflow-status" id="wfStatus"></div>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:8px;">
+          <button class="btn btn-sm" onclick="markComplete()" id="completeBtn">Mark complete</button>
+        </div>
+      </div>
+
+      <div class="stage-bar">
+        <div class="stage-pill active" id="pill-1" onclick="goToStage(1)">1. Upload</div>
+        <div class="stage-pill" id="pill-2" onclick="goToStage(2)">2. Review data</div>
+        <div class="stage-pill" id="pill-3" onclick="goToStage(3)">3. Sitemap</div>
+        <div class="stage-pill" id="pill-4" onclick="goToStage(4)">4. Generate copy</div>
+        <div class="stage-pill" id="pill-5" onclick="goToStage(5)">5. Export</div>
+      </div>
+
+      <!-- Stage 1: Upload -->
+      <div id="stage-1">
+        <div class="card">
+          <div class="card-title">Upload master record</div>
+          <div class="card-sub">Export the client's ClickUp master record as Markdown (.md) and upload it here.</div>
+          <input type="file" id="mdUpload" accept=".md,.txt" style="display:none" onchange="handleUpload(this)">
+          <div id="dropZone" onclick="document.getElementById('mdUpload').click()" style="border:2px dashed var(--border2);border-radius:var(--radius);padding:32px;text-align:center;cursor:pointer;color:var(--muted);transition:border-color 0.15s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border2)'">
+            <div style="font-size:24px;margin-bottom:8px">↑</div>
+            <div style="font-weight:500;margin-bottom:4px">Click to upload .md file</div>
+            <div style="font-size:12px">Export from ClickUp as Markdown</div>
+          </div>
+          <div id="uploadStatus" style="margin-top:12px;font-size:13px;color:var(--muted)"></div>
+        </div>
+      </div>
+
+      <!-- Stage 2: Review parsed data -->
+      <div id="stage-2" style="display:none">
+        <div class="notice notice-info">Review extracted data. Items marked Missing are gaps that will appear in the gap report.</div>
+        <div class="card">
+          <div class="card-title" id="parsedPracticeName">Client data</div>
+          <div class="card-sub">Confirm this is accurate before generating the sitemap.</div>
+          <div class="parsed-grid" id="parsedGrid"></div>
+          <div style="margin-top:16px;display:flex;gap:10px;">
+            <button class="btn btn-primary" onclick="proceedToSitemap()">Generate sitemap</button>
+            <span id="sitemapGenStatus" style="font-size:13px;color:var(--muted);align-self:center;"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stage 3: Sitemap -->
+      <div id="stage-3" style="display:none">
+        <div class="notice notice-info">Review the recommended sitemap. Approve to begin copy generation.</div>
+        <div class="card">
+          <div class="card-title" id="sitemapTitle">Sitemap</div>
+          <div class="card-sub">10-page standard build, ranked by local SEO and revenue priority.</div>
+          <table class="sitemap-table">
+            <thead><tr><th>#</th><th>Page</th><th>URL</th><th>Type</th><th>Rationale</th></tr></thead>
+            <tbody id="sitemapBody"></tbody>
+          </table>
+          <div class="add-pages-title">Recommended additional pages (upsell opportunities)</div>
+          <table class="sitemap-table">
+            <thead><tr><th>Priority</th><th>Page</th><th>URL</th><th>Value</th><th>Rationale</th></tr></thead>
+            <tbody id="addPagesBody"></tbody>
+          </table>
+          <div style="margin-top:20px;display:flex;gap:10px;">
+            <button class="btn btn-primary" onclick="approveAndGenerate()">Approve and generate copy</button>
+            <button class="btn" onclick="exportSitemap()">Download sitemap</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stage 4: Generate copy -->
+      <div id="stage-4" style="display:none">
+        <div class="notice notice-info" id="genNotice">Pages generate one at a time. Click any completed page to preview.</div>
+        <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+
+        <div style="display:flex;gap:16px;flex-wrap:wrap;">
+          <div style="flex:0 0 260px;">
+            <div id="pagesList"></div>
+          </div>
+          <div style="flex:1;min-width:0;">
+            <div class="viewer-wrap" id="viewerWrap">
+              <div class="viewer-tabs">
+                <div class="vtab active" onclick="switchVTab('layout',this)">Layout map</div>
+                <div class="vtab" onclick="switchVTab('copy',this)">Copy</div>
+                <div class="vtab" onclick="switchVTab('aeo',this)">AEO blocks</div>
+                <div class="vtab" onclick="switchVTab('faq',this)">FAQ schema</div>
+                <div class="vtab" onclick="switchVTab('seo',this)">SEO</div>
+                <div class="vtab" onclick="switchVTab('gaps',this)">Gaps</div>
+              </div>
+              <div id="vtab-layout"></div>
+              <div id="vtab-copy" style="display:none"></div>
+              <div id="vtab-aeo" style="display:none"></div>
+              <div id="vtab-faq" style="display:none"></div>
+              <div id="vtab-seo" style="display:none"></div>
+              <div id="vtab-gaps" style="display:none"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stage 5: Export -->
+      <div id="stage-5" style="display:none">
+        <div class="notice notice-ok">All pages generated. Download individual pages or the full package.</div>
+        <div class="card">
+          <div class="card-title">Export</div>
+          <div class="card-sub">Each file includes layout map, copy sections, SEO metadata, AEO blocks, FAQ schema, and gap flags.</div>
+          <div style="display:flex;gap:10px;margin-bottom:20px;">
+            <button class="btn btn-primary" onclick="downloadFullPackage()">Download full package (.docx)</button>
+            <button class="btn" onclick="downloadGapReport()">Download gap report</button>
+          </div>
+          <div class="dl-grid" id="dlGrid"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /main -->
+</div><!-- /app -->
+
+<!-- New project modal -->
+<div class="modal-overlay" id="newProjectModal">
+  <div class="modal">
+    <div class="modal-title">New project</div>
+    <div class="form-group">
+      <label class="form-label">Client name</label>
+      <input class="form-input" id="newClientName" placeholder="e.g. Forever Young Aesthetics" onkeydown="if(event.key==='Enter')createProject()">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Build type</label>
+      <select class="form-input" id="newBuildType">
+        <option value="new">New build</option>
+        <option value="rebuild">Rebuild / redesign</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('newProjectModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="createProject()">Create project</button>
+    </div>
+  </div>
+</div>
+
+<!-- Regen feedback modal -->
+<div class="modal-overlay" id="regenModal">
+  <div class="regen-modal">
+    <div class="modal-title">Regenerate section</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:12px;" id="regenSectionLabel"></div>
+    <div class="form-group">
+      <label class="form-label">Feedback (optional)</label>
+      <textarea class="regen-textarea" id="regenFeedback" placeholder="e.g. Make this less generic. Focus more on Marisa's education-first approach. Avoid listing devices."></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('regenModal')">Cancel</button>
+      <button class="btn btn-primary" id="regenSubmitBtn" onclick="submitRegen()">Regenerate</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── STATE ────────────────────────────────────────────────────────────────────
+var S = {
+  token: null,
+  userEmail: null,
+  currentProject: null,
+  parsedData: null,
+  masterRecordRaw: null,
+  sitemap: null,
+  pages: [],
+  currentPageIndex: null,
+  regenTarget: null
+};
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+window.onload = function () {
+  var saved = localStorage.getItem('mmw_token');
+  var email = localStorage.getItem('mmw_email');
+  if (saved && email) {
+    S.token = saved;
+    S.userEmail = email;
+    showLoggedIn();
+    loadProjects();
+  }
+};
+
+// ─── AUTH ─────────────────────────────────────────────────────────────────────
+async function doLogin() {
+  var btn = document.getElementById('loginBtn');
+  var errEl = document.getElementById('loginError');
+  var email = document.getElementById('loginEmail').value.trim();
+  var password = document.getElementById('loginPassword').value;
+  errEl.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = 'Signing in...';
+  try {
+    var res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Login failed');
+    S.token = data.token;
+    S.userEmail = data.user;
+    localStorage.setItem('mmw_token', S.token);
+    localStorage.setItem('mmw_email', S.userEmail);
+    showLoggedIn();
+    loadProjects();
+  } catch (e) {
+    errEl.textContent = e.message;
+    errEl.style.display = 'block';
+  }
+  btn.disabled = false;
+  btn.textContent = 'Sign in';
+}
+
+function showLoggedIn() {
+  document.getElementById('userBadge').textContent = S.userEmail;
+  document.getElementById('logoutBtn').style.display = 'block';
+  showScreen('projects');
+}
+
+function logout() {
+  localStorage.removeItem('mmw_token');
+  localStorage.removeItem('mmw_email');
+  S.token = null;
+  document.getElementById('logoutBtn').style.display = 'none';
+  document.getElementById('userBadge').textContent = '';
+  showScreen('login');
+}
+
+// ─── API HELPER ───────────────────────────────────────────────────────────────
+async function api(method, path, body) {
+  var opts = {
+    method,
+    headers: { 'Authorization': 'Bearer ' + S.token, 'Content-Type': 'application/json' }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  var res = await fetch(path, opts);
+  var data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'API error');
+  return data;
+}
+
+// ─── SCREENS ──────────────────────────────────────────────────────────────────
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(function (s) { s.classList.remove('active'); });
+  document.getElementById('screen-' + name).classList.add('active');
+}
+
+// ─── PROJECTS ─────────────────────────────────────────────────────────────────
+async function loadProjects() {
+  try {
+    var projects = await api('GET', '/api/projects');
+    renderProjects(projects);
+  } catch (e) {
+    document.getElementById('projectGrid').innerHTML = '<div style="color:var(--danger);font-size:13px">' + e.message + '</div>';
+  }
+}
+
+function renderProjects(projects) {
+  var grid = document.getElementById('projectGrid');
+  var html = projects.map(function (p) {
+    var date = new Date(p.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return '<div class="project-card" onclick="openProject(\'' + p.id + '\')">' +
+      '<div class="project-card-name">' + esc(p.client_name) + '</div>' +
+      '<div class="project-card-meta">' + esc(p.build_type) + ' &nbsp;·&nbsp; Updated ' + date + '</div>' +
+      '<span class="status-pill status-' + p.status + '">' + (p.status === 'complete' ? 'Complete' : 'In progress') + '</span>' +
+      '</div>';
+  }).join('');
+  html += '<div class="project-card new-project-card" onclick="openNewProjectModal()">' +
+    '<div class="plus-icon">+</div><div>New project</div></div>';
+  grid.innerHTML = html;
+}
+
+function openNewProjectModal() {
+  document.getElementById('newClientName').value = '';
+  openModal('newProjectModal');
+  setTimeout(function () { document.getElementById('newClientName').focus(); }, 100);
+}
+
+async function createProject() {
+  var name = document.getElementById('newClientName').value.trim();
+  var buildType = document.getElementById('newBuildType').value;
+  if (!name) return;
+  try {
+    var project = await api('POST', '/api/projects', { clientName: name, buildType });
+    closeModal('newProjectModal');
+    openProject(project.id);
+  } catch (e) { alert(e.message); }
+}
+
+async function openProject(id) {
+  try {
+    var project = await api('GET', '/api/projects/' + id);
+    S.currentProject = project;
+    S.parsedData = project.parsed_data || null;
+    S.sitemap = project.sitemap || null;
+    S.pages = project.pages || [];
+    document.getElementById('wfClientName').textContent = project.client_name;
+    document.getElementById('wfStatus').textContent = project.build_type + ' build';
+    showScreen('workflow');
+    // Resume at the furthest stage completed
+    if (S.pages && S.pages.length > 0) {
+      restoreStage(4);
+    } else if (S.sitemap) {
+      restoreStage(3);
+    } else if (S.parsedData) {
+      restoreStage(2);
+      renderParsedData(S.parsedData);
+    } else {
+      goToStage(1);
+    }
+  } catch (e) { alert(e.message); }
+}
+
+function goToProjects() {
+  S.currentProject = null;
+  S.parsedData = null;
+  S.sitemap = null;
+  S.pages = [];
+  showScreen('projects');
+  loadProjects();
+}
+
+async function markComplete() {
+  if (!S.currentProject) return;
+  try {
+    await api('PUT', '/api/projects/' + S.currentProject.id, { status: 'complete' });
+    document.getElementById('wfStatus').textContent = S.currentProject.build_type + ' build — Complete';
+  } catch (e) { alert(e.message); }
+}
+
+// ─── STAGES ───────────────────────────────────────────────────────────────────
+function goToStage(n) {
+  for (var i = 1; i <= 5; i++) {
+    var el = document.getElementById('stage-' + i);
+    if (el) el.style.display = i === n ? 'block' : 'none';
+    var pill = document.getElementById('pill-' + i);
+    if (pill) {
+      pill.classList.remove('active', 'done');
+      if (i < n) pill.classList.add('done');
+      else if (i === n) pill.classList.add('active');
+    }
+  }
+}
+
+function restoreStage(n) { goToStage(n); }
+
+// ─── UPLOAD ───────────────────────────────────────────────────────────────────
+async function handleUpload(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var status = document.getElementById('uploadStatus');
+  status.innerHTML = '<span class="spinner"></span> Parsing master record...';
+  try {
+    var text = await file.text();
+    S.masterRecordRaw = text;
+    // Send as plain text to /api/parse
+    var res = await fetch('/api/parse', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + S.token, 'Content-Type': 'text/plain' },
+      body: text
+    });
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Parse failed');
+    S.parsedData = data.parsed;
+    // Save to project
+    await api('PUT', '/api/projects/' + S.currentProject.id, {
+      parsedData: S.parsedData,
+      masterRecordRaw: S.masterRecordRaw
+    });
+    status.textContent = 'Parsed successfully.';
+    renderParsedData(S.parsedData);
+    goToStage(2);
+  } catch (e) {
+    status.style.color = 'var(--danger)';
+    status.textContent = 'Error: ' + e.message;
+  }
+}
+
+function renderParsedData(d) {
+  var fields = [
+    ['Practice name', d.practiceName],
+    ['Website', d.website],
+    ['Location', d.primaryLocation],
+    ['Phone', d.phone],
+    ['Provider', d.providerName + (d.providerCredentials ? ', ' + d.providerCredentials : '')],
+    ['Medical director', d.medicalDirector],
+    ['#1 Service', d.service1],
+    ['#2 Service', d.service2],
+    ['#3 Service', d.service3],
+    ['Target cities', (d.targetCities || []).join(', ')],
+    ['Brand voice', d.brandVoice],
+    ['Payment', d.paymentOptions],
+    ['Insurance', d.insuranceAccepted],
+    ['Year founded', d.yearFounded]
+  ];
+  document.getElementById('parsedPracticeName').textContent = d.practiceName || 'Client data';
+  document.getElementById('parsedGrid').innerHTML = fields.map(function (f) {
+    var isGap = !f[1] || String(f[1]).startsWith('GAP:');
+    return '<div class="pfield">' +
+      '<div class="pfield-key">' + esc(f[0]) + '</div>' +
+      '<div class="pfield-val' + (isGap ? ' gap' : '') + '">' +
+      (isGap ? '<span class="gap-badge">Missing</span>' : esc(String(f[1] || '')).substring(0, 80)) +
+      '</div></div>';
+  }).join('');
+}
+
+// ─── SITEMAP ──────────────────────────────────────────────────────────────────
+async function proceedToSitemap() {
+  var btn = event.target;
+  var status = document.getElementById('sitemapGenStatus');
+  btn.disabled = true;
+  status.innerHTML = '<span class="spinner"></span> Generating sitemap...';
+  try {
+    var sitemap = await api('POST', '/api/sitemap', { clientData: S.parsedData });
+    S.sitemap = sitemap;
+    await api('PUT', '/api/projects/' + S.currentProject.id, { sitemap: S.sitemap });
+    renderSitemap(sitemap);
+    goToStage(3);
+  } catch (e) {
+    status.style.color = 'var(--danger)';
+    status.textContent = 'Error: ' + e.message;
+  }
+  btn.disabled = false;
+}
+
+function renderSitemap(sitemap) {
+  document.getElementById('sitemapTitle').textContent = 'Sitemap — ' + (S.parsedData.practiceName || 'Client');
+  document.getElementById('sitemapBody').innerHTML = (sitemap.pages || []).map(function (p) {
+    var typeClass = p.type === 'core' ? 'type-core' : p.type === 'service' ? 'type-service' : 'type-support';
+    return '<tr><td>' + p.number + '</td><td><strong>' + esc(p.name) + '</strong></td><td style="font-family:monospace;font-size:12px">' + esc(p.url) + '</td>' +
+      '<td><span class="type-badge ' + typeClass + '">' + esc(p.type) + '</span></td><td style="font-size:12px;color:var(--muted)">' + esc(p.rationale || '') + '</td></tr>';
+  }).join('');
+  document.getElementById('addPagesBody').innerHTML = (sitemap.additionalPages || []).map(function (p) {
+    var val = p.value === 'high' ? 'success' : p.value === 'medium' ? 'warn' : 'muted';
+    return '<tr><td>' + p.priority + '</td><td>' + esc(p.name) + '</td><td style="font-family:monospace;font-size:12px">' + esc(p.url) + '</td>' +
+      '<td><span style="color:var(--' + val + ')">' + esc(p.value || '') + '</span></td><td style="font-size:12px;color:var(--muted)">' + esc(p.rationale || '') + '</td></tr>';
+  }).join('');
+}
+
+function exportSitemap() {
+  if (!S.sitemap) return;
+  var lines = ['SITEMAP — ' + (S.parsedData.practiceName || 'Client'), '='.repeat(50), ''];
+  (S.sitemap.pages || []).forEach(function (p) {
+    lines.push(p.number + '. ' + p.name + ' (' + p.url + ')');
+    lines.push('   Type: ' + p.type);
+    lines.push('   Rationale: ' + (p.rationale || ''));
+    lines.push('');
+  });
+  lines.push('ADDITIONAL PAGES (UPSELL OPPORTUNITIES)', '-'.repeat(40));
+  (S.sitemap.additionalPages || []).forEach(function (p) {
+    lines.push(p.priority + '. ' + p.name + ' (' + p.url + ') — ' + (p.value || '') + ' value');
+    lines.push('   ' + (p.rationale || ''));
+    lines.push('');
+  });
+  dl(lines.join('\n'), (S.parsedData.practiceName || 'client').replace(/\s+/g, '_') + '_sitemap.txt');
+}
+
+// ─── GENERATION ───────────────────────────────────────────────────────────────
+async function approveAndGenerate() {
+  goToStage(4);
+  S.pages = S.sitemap.pages.map(function (p) { return { ...p, generated: null }; });
+  renderPagesList();
+  await generateAllPages();
+}
+
+function renderPagesList() {
+  document.getElementById('pagesList').innerHTML = S.pages.map(function (p, i) {
+    return '<div class="page-row" id="prow-' + i + '" onclick="openPageViewer(' + i + ')">' +
+      '<div><div class="pr-name">' + esc(p.name) + '</div><div class="pr-url">' + esc(p.url) + '</div></div>' +
+      '<span class="pr-status s-q" id="pstat-' + i + '">Queued</span></div>';
+  }).join('');
+}
+
+async function generateAllPages() {
+  var total = S.pages.length;
+  for (var i = 0; i < total; i++) {
+    var page = S.pages[i];
+    document.getElementById('pstat-' + i).className = 'pr-status s-g';
+    document.getElementById('pstat-' + i).innerHTML = '<span class="spinner"></span>';
+    document.getElementById('progressFill').style.width = Math.round((i / total) * 100) + '%';
+    document.getElementById('genNotice').textContent = 'Generating ' + page.name + ' (' + (i + 1) + ' of ' + total + ')...';
+    try {
+      var result = await api('POST', '/api/generate', {
+        page: page,
+        clientData: S.parsedData,
+        sitemapPages: S.sitemap.pages
+      });
+      S.pages[i].generated = result;
+      var gapCount = result.gapFlags ? result.gapFlags.length : 0;
+      document.getElementById('pstat-' + i).className = 'pr-status ' + (gapCount ? 's-gap' : 's-done');
+      document.getElementById('pstat-' + i).textContent = gapCount ? '⚠ ' + gapCount + ' gap(s)' : 'Ready';
+    } catch (e) {
+      document.getElementById('pstat-' + i).className = 'pr-status s-err';
+      document.getElementById('pstat-' + i).textContent = 'Error';
+    }
+  }
+  document.getElementById('progressFill').style.width = '100%';
+  document.getElementById('genNotice').textContent = 'All pages generated.';
+  // Save pages to project
+  try {
+    var gapReport = buildGapReport();
+    await api('PUT', '/api/projects/' + S.currentProject.id, {
+      pages: S.pages,
+      gapReport: gapReport,
+      status: 'in_progress'
+    });
+  } catch (e) { console.error('Save failed:', e); }
+  renderExportGrid();
+}
+
+// ─── PAGE VIEWER ──────────────────────────────────────────────────────────────
+function openPageViewer(i) {
+  S.currentPageIndex = i;
+  document.querySelectorAll('.page-row').forEach(function (r) { r.classList.remove('active-page'); });
+  document.getElementById('prow-' + i).classList.add('active-page');
+  var page = S.pages[i];
+  if (!page || !page.generated) return;
+  var c = page.generated;
+  document.getElementById('viewerWrap').classList.add('open');
+  renderLayoutTab(c);
+  renderCopyTab(c);
+  renderAEOTab(c);
+  renderFAQTab(c);
+  renderSEOTab(c);
+  renderGapsTab(c);
+  switchVTab('layout', document.querySelector('.vtab'));
+}
+
+function switchVTab(id, el) {
+  ['layout','copy','aeo','faq','seo','gaps'].forEach(function (t) {
+    document.getElementById('vtab-' + t).style.display = t === id ? 'block' : 'none';
+  });
+  document.querySelectorAll('.vtab').forEach(function (t) { t.classList.remove('active'); });
+  if (el) el.classList.add('active');
+}
+
+function patternClass(p) {
+  var map = { hero:'p-hero', intro_text:'p-intro', service_cards:'p-cards', icon_grid:'p-grid',
+    three_col_highlights:'p-three', two_col_text:'p-two', location_info:'p-loc',
+    testimonials:'p-test', booking_cta:'p-cta', compliance_footer:'p-comp' };
+  return map[p] || 'p-other';
+}
+
+function renderLayoutTab(c) {
+  var layout = c.layout || [];
+  document.getElementById('vtab-layout').innerHTML =
+    '<div style="font-size:12px;color:var(--muted);margin-bottom:12px">' + layout.length + ' sections in recommended order. Click any row to jump to its copy.</div>' +
+    '<div class="layout-map">' +
+    layout.map(function (s, i) {
+      var preview = s.headline || s.body || '';
+      return '<div class="lm-row">' +
+        '<div class="lm-num">' + s.order + '</div>' +
+        '<div class="lm-card">' +
+        '<span class="pattern-pill ' + patternClass(s.pattern) + '">' + esc(s.pattern) + '</span>' +
+        '<span class="lm-name">' + esc(s.sectionName) + '</span>' +
+        '<span class="lm-preview">' + esc(preview.substring(0, 60)) + '</span>' +
+        '<button class="regen-btn" onclick="openRegenModal(' + S.currentPageIndex + ',' + i + ',event)">Regenerate</button>' +
+        '</div></div>';
+    }).join('') + '</div>';
+}
+
+function renderCopyTab(c) {
+  var layout = c.layout || [];
+  document.getElementById('vtab-copy').innerHTML = layout.map(function (s, i) {
+    var bodyHtml = (s.body || '').replace(/\[GAP[^\]]*\]/g, function (m) {
+      return '<span class="gap-inline">' + esc(m) + '</span>';
+    });
+    var itemsHtml = '';
+    if (s.items && s.items.length) {
+      itemsHtml = '<div class="section-items">' + s.items.map(function (item) {
+        return '<div class="section-item"><div class="section-item-h">' + esc(item.heading || '') + '</div>' +
+          '<div class="section-item-b">' + esc(item.body || '') + '</div></div>';
+      }).join('') + '</div>';
+    }
+    return '<div class="section-block">' +
+      '<div class="section-label"><span>' + esc(s.pattern) + ' — ' + esc(s.sectionName) + '</span>' +
+      '<button class="regen-btn" onclick="openRegenModal(' + S.currentPageIndex + ',' + i + ',event)">Regenerate</button></div>' +
+      (s.headline ? '<div class="section-headline">' + esc(s.headline) + '</div>' : '') +
+      (s.subheadline ? '<div class="section-sub">' + esc(s.subheadline) + '</div>' : '') +
+      (s.body ? '<div class="section-body">' + bodyHtml + '</div>' : '') +
+      itemsHtml +
+      (s.cta ? '<div class="section-cta">CTA: ' + esc(s.cta.label) + ' → ' + esc(s.cta.destination || '') + '</div>' : '') +
+      (s.notes ? '<div class="section-note">Build note: ' + esc(s.notes) + '</div>' : '') +
+      '</div>';
+  }).join('');
+}
+
+function renderAEOTab(c) {
+  var aeo = c.aeoBlocks || [];
+  document.getElementById('vtab-aeo').innerHTML =
+    '<div style="font-size:12px;color:var(--muted);margin-bottom:12px">These prose passages get embedded into the sections noted below. Written for AI answer engines (Google AI Overviews, Perplexity, ChatGPT) — do not format as Q&A on the page.</div>' +
+    aeo.map(function (b) {
+      return '<div class="aeo-block"><div class="aeo-q">' + esc(b.question || '') + '</div>' +
+        '<div class="aeo-placed">Place in: ' + esc(b.placedInSection || '') + '</div>' +
+        '<div class="aeo-a">' + esc(b.answer || '') + '</div></div>';
+    }).join('');
+}
+
+function renderFAQTab(c) {
+  var faq = c.faqSchema || [];
+  var jsonLd = JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": faq.map(function (f) {
+      return { "@type": "Question", "name": f.q, "acceptedAnswer": { "@type": "Answer", "text": f.a } };
+    })
+  }, null, 2);
+  document.getElementById('vtab-faq').innerHTML =
+    '<div style="font-size:12px;color:var(--muted);margin-bottom:12px">Visible FAQ accordion on page + JSON-LD structured data for Google rich results.</div>' +
+    faq.map(function (f) {
+      return '<div class="faq-item"><div class="faq-q">' + esc(f.q) + '</div><div class="faq-a">' + esc(f.a) + '</div></div>';
+    }).join('') +
+    '<div style="margin-top:20px"><div class="seo-key">JSON-LD (paste into page head)</div><div class="mono">' + esc(jsonLd) + '</div></div>';
+}
+
+function renderSEOTab(c) {
+  document.getElementById('vtab-seo').innerHTML =
+    seoRow('Page title', c.pageTitle) +
+    seoRow('Meta description', c.metaDescription) +
+    seoRow('H1', c.h1) +
+    seoRow('Schema type', c.schemaType) +
+    seoRow('Tone modifier', c.toneModifier) +
+    seoRow('URL', c.url) +
+    seoRow('SEO notes', c.seoNotes);
+}
+
+function seoRow(key, val) {
+  return '<div class="seo-row"><div class="seo-key">' + esc(key) + '</div><div class="seo-val">' + esc(val || '—') + '</div></div>';
+}
+
+function renderGapsTab(c) {
+  var gaps = c.gapFlags || [];
+  if (!gaps.length) {
+    document.getElementById('vtab-gaps').innerHTML = '<div class="no-gaps">No gaps flagged for this page</div>';
+    return;
+  }
+  document.getElementById('vtab-gaps').innerHTML = gaps.map(function (g) {
+    return '<div class="gap-item' + (g.blocksPublish ? ' blocker' : '') + '">' +
+      '<div class="gap-sec">Section: ' + esc(g.section || '') + (g.blocksPublish ? ' — <strong style="color:var(--danger)">Blocks publishing</strong>' : '') + '</div>' +
+      '<div class="gap-missing">' + esc(g.missing || '') + '</div>' +
+      '<div class="gap-req">Suggested ask: "' + esc(g.requestLanguage || '') + '"</div></div>';
+  }).join('');
+}
+
+// ─── SECTION REGENERATION ────────────────────────────────────────────────────
+function openRegenModal(pageIdx, sectionIdx, evt) {
+  if (evt) evt.stopPropagation();
+  S.regenTarget = { pageIdx, sectionIdx };
+  var page = S.pages[pageIdx];
+  var section = page && page.generated && page.generated.layout && page.generated.layout[sectionIdx];
+  if (!section) return;
+  document.getElementById('regenSectionLabel').textContent = section.sectionName + ' (' + section.pattern + ')';
+  document.getElementById('regenFeedback').value = '';
+  openModal('regenModal');
+}
+
+async function submitRegen() {
+  var btn = document.getElementById('regenSubmitBtn');
+  var feedback = document.getElementById('regenFeedback').value.trim();
+  var { pageIdx, sectionIdx } = S.regenTarget;
+  var page = S.pages[pageIdx];
+  var section = page.generated.layout[sectionIdx];
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Regenerating...';
+  try {
+    var newSection = await api('POST', '/api/regenerate-section', {
+      section: section,
+      feedback: feedback,
+      pageContext: { pageName: page.generated.pageName, url: page.generated.url, toneModifier: page.generated.toneModifier },
+      clientData: S.parsedData
+    });
+    S.pages[pageIdx].generated.layout[sectionIdx] = newSection;
+    // Save updated pages
+    await api('PUT', '/api/projects/' + S.currentProject.id, { pages: S.pages });
+    closeModal('regenModal');
+    openPageViewer(pageIdx);
+  } catch (e) { alert('Regeneration failed: ' + e.message); }
+  btn.disabled = false;
+  btn.textContent = 'Regenerate';
+}
+
+// ─── GAP REPORT ───────────────────────────────────────────────────────────────
+function buildGapReport() {
+  var report = [];
+  S.pages.forEach(function (page) {
+    if (!page.generated) return;
+    (page.generated.gapFlags || []).forEach(function (g) {
+      report.push({ page: page.name, url: page.url, ...g });
+    });
+  });
+  return report;
+}
+
+// ─── EXPORT ───────────────────────────────────────────────────────────────────
+function renderExportGrid() {
+  var grid = document.getElementById('dlGrid');
+  grid.innerHTML = S.pages.map(function (p, i) {
+    if (!p.generated) return '';
+    var gaps = p.generated.gapFlags ? p.generated.gapFlags.length : 0;
+    return '<div class="dl-card">' +
+      '<div class="dl-name">' + esc(p.name) + '</div>' +
+      '<div class="dl-meta">' + esc(p.url) + (gaps ? ' — ⚠ ' + gaps + ' gap(s)' : '') + '</div>' +
+      '<button class="btn btn-sm" onclick="downloadPage(' + i + ')">Download .docx</button>' +
+      '</div>';
+  }).join('');
+  goToStage(5);
+}
+
+function downloadPage(i) {
+  var page = S.pages[i];
+  if (!page || !page.generated) return;
+  var lines = buildPageText(page.generated);
+  downloadAsDocx(lines, (S.parsedData.practiceName || 'client').replace(/\s+/g, '_') + '_' + page.name.replace(/\s+/g, '_') + '.txt');
+}
+
+function downloadFullPackage() {
+  var allLines = ['MMW CONTENT ENGINE — FULL PACKAGE', '='.repeat(60),
+    'Client: ' + (S.parsedData.practiceName || ''), 'Generated: ' + new Date().toLocaleDateString(), '', ''];
+  S.pages.forEach(function (p) {
+    if (!p.generated) return;
+    allLines.push('='.repeat(60));
+    allLines.push('PAGE: ' + p.name + ' (' + p.url + ')');
+    allLines.push('='.repeat(60));
+    allLines = allLines.concat(buildPageText(p.generated));
+    allLines.push('');
+  });
+  allLines.push('='.repeat(60));
+  allLines.push('CONSOLIDATED GAP REPORT');
+  allLines.push('='.repeat(60));
+  S.pages.forEach(function (p) {
+    if (!p.generated) return;
+    (p.generated.gapFlags || []).forEach(function (g) {
+      allLines.push('[' + p.name + '] ' + g.section + ': ' + g.missing + (g.blocksPublish ? ' [BLOCKS PUBLISH]' : ''));
+      allLines.push('Ask: "' + g.requestLanguage + '"');
+      allLines.push('');
+    });
+  });
+  downloadAsDocx(allLines, (S.parsedData.practiceName || 'client').replace(/\s+/g, '_') + '_full_package.txt');
+}
+
+function downloadGapReport() {
+  var report = buildGapReport();
+  var lines = ['GAP REPORT — ' + (S.parsedData.practiceName || ''), '='.repeat(50), ''];
+  if (!report.length) { lines.push('No gaps flagged across all pages.'); }
+  else {
+    report.forEach(function (g) {
+      lines.push('[' + g.page + '] ' + g.section);
+      lines.push('Missing: ' + g.missing + (g.blocksPublish ? ' [BLOCKS PUBLISH]' : ''));
+      lines.push('Ask: "' + g.requestLanguage + '"');
+      lines.push('');
+    });
+  }
+  downloadAsDocx(lines, (S.parsedData.practiceName || 'client').replace(/\s+/g, '_') + '_gap_report.txt');
+}
+
+function buildPageText(c) {
+  var lines = [
+    'PAGE: ' + (c.pageName || ''), 'URL: ' + (c.url || ''),
+    'PAGE TITLE: ' + (c.pageTitle || ''), 'META: ' + (c.metaDescription || ''),
+    'H1: ' + (c.h1 || ''), 'SCHEMA: ' + (c.schemaType || ''), ''
+  ];
+  lines.push('=== LAYOUT & COPY ===');
+  (c.layout || []).forEach(function (s) {
+    lines.push('');
+    lines.push('[' + s.order + '] ' + s.sectionName + ' (' + s.pattern + ')');
+    if (s.headline) lines.push('H2: ' + s.headline);
+    if (s.subheadline) lines.push('H3: ' + s.subheadline);
+    if (s.body) lines.push(s.body);
+    if (s.items) s.items.forEach(function (item) {
+      lines.push('  - ' + item.heading + ': ' + item.body);
+    });
+    if (s.cta) lines.push('CTA: ' + s.cta.label + ' -> ' + (s.cta.destination || ''));
+    if (s.notes) lines.push('[BUILD NOTE: ' + s.notes + ']');
+  });
+  lines.push('');
+  lines.push('=== AEO BLOCKS ===');
+  (c.aeoBlocks || []).forEach(function (b) {
+    lines.push('Q: ' + b.question);
+    lines.push('Place in: ' + b.placedInSection);
+    lines.push(b.answer);
+    lines.push('');
+  });
+  lines.push('=== FAQ SCHEMA ===');
+  (c.faqSchema || []).forEach(function (f) {
+    lines.push('Q: ' + f.q);
+    lines.push('A: ' + f.a);
+    lines.push('');
+  });
+  lines.push('=== SEO NOTES ===');
+  lines.push(c.seoNotes || '');
+  if (c.gapFlags && c.gapFlags.length) {
+    lines.push('');
+    lines.push('=== GAP FLAGS ===');
+    c.gapFlags.forEach(function (g) {
+      lines.push('[' + g.section + (g.blocksPublish ? ' - BLOCKS PUBLISH' : '') + '] ' + g.missing);
+      lines.push('Ask: "' + g.requestLanguage + '"');
+    });
+  }
+  return lines;
+}
+
+// Downloads as .txt (rename to .docx note in README - true docx requires libraries)
+function downloadAsDocx(lines, filename) {
+  dl(lines.join('\n'), filename);
+}
+
+function dl(content, filename) {
+  var blob = new Blob([content], { type: 'text/plain' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+}
+
+// ─── MODAL HELPERS ────────────────────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
