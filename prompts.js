@@ -165,7 +165,7 @@ Return this structure:
   ]
 }
 
-Generate exactly ${pageCount || 10} core pages. Then up to 8 additional pages as upsell opportunities.`;
+Generate exactly ${pageCount || 10} core pages. Then up to 8 additional pages as upsell opportunities. For large sites (over 30 pages), focus additional pages on the highest-value service and location combinations.`;
 
 
 // ─── PAGE BRIEF BUILDER ───────────────────────────────────────────────────────

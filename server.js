@@ -311,7 +311,7 @@ var server = http.createServer(async function (req, res) {
 
       var result = await callAnthropic({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
+        max_tokens: 10000,
         messages: [{
           role: 'user',
           content: PARSE_PROMPT + '\n\n---\n\n' + markdownText
@@ -334,7 +334,7 @@ var server = http.createServer(async function (req, res) {
 
       var result = await callAnthropic({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
+        max_tokens: 10000,
         system: SITEMAP_SYSTEM,
         messages: [{ role: 'user', content: SITEMAP_USER(clientData, body.pageCount, body.feedback) }]
       });
@@ -355,7 +355,7 @@ var server = http.createServer(async function (req, res) {
 
       var result = await callAnthropic({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 5000,
+        max_tokens: 10000,
         system: SYSTEM_PROMPT,
         messages: [{ role: 'user', content: buildPageBrief(page, clientData, sitemapPages) }]
       });

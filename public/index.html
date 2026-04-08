@@ -322,8 +322,8 @@ a { color: var(--accent); text-decoration: none; }
             <div style="font-size:13px;font-weight:500;margin-bottom:12px;">Sitemap options</div>
             <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
               <label class="form-label" style="margin-bottom:0;white-space:nowrap">Number of pages</label>
-              <input type="number" id="pageCountInput" value="10" min="3" max="50" class="form-input" style="width:80px">
-              <span style="font-size:12px;color:var(--muted)">Standard builds: 10. Large sites: up to 50.</span>
+              <input type="number" id="pageCountInput" value="10" min="3" max="200" class="form-input" style="width:80px">
+              <span style="font-size:12px;color:var(--muted)">Standard builds: 10. Large sites: up to 200.</span>
             </div>
             <div style="margin-bottom:14px;">
               <label class="form-label" style="display:block;margin-bottom:6px">Special instructions (optional)</label>
@@ -358,7 +358,11 @@ a { color: var(--accent); text-decoration: none; }
               </div>
               <div style="display:flex;gap:8px;flex-wrap:wrap;">
                 <button class="btn btn-sm" onclick="addSitemapRow()">+ Add page</button>
-                <button class="btn btn-sm" onclick="exportSitemap()">Download</button>
+                <button class="btn btn-sm" onclick="exportSitemap()">Download .txt</button>
+                <label class="btn btn-sm" style="cursor:pointer;margin:0;" title="Re-upload a previously downloaded and edited sitemap .txt file">
+                  Upload revised .txt
+                  <input type="file" accept=".txt" style="display:none" onchange="uploadRevisedSitemap(this)">
+                </label>
                 <button class="btn btn-primary btn-sm" onclick="approveAndGenerate()">Approve and generate copy</button>
               </div>
             </div>
@@ -631,6 +635,8 @@ async function openProject(id) {
     // Resume at the furthest stage completed
     if (S.pages && S.pages.length > 0) {
       restoreStage(4);
+      renderPagesList();
+      renderExportGrid();
     } else if (S.sitemap) {
       restoreStage(3);
       renderSitemap(S.sitemap);
@@ -888,9 +894,16 @@ async function approveAndGenerate() {
 
 function renderPagesList() {
   document.getElementById('pagesList').innerHTML = S.pages.map(function (p, i) {
-    return '<div class="page-row" id="prow-' + i + '" onclick="openPageViewer(' + i + ')">' +
-      '<div><div class="pr-name">' + esc(p.name) + '</div><div class="pr-url">' + esc(p.url) + '</div></div>' +
-      '<span class="pr-status s-q" id="pstat-' + i + '">Queued</span></div>';
+    var hasGenerated = p.generated != null;
+    var gapCount = hasGenerated && p.generated.gapFlags ? p.generated.gapFlags.length : 0;
+    var statusClass = hasGenerated ? (gapCount ? 's-gap' : 's-done') : (p.error ? 's-err' : 's-q');
+    var statusText = hasGenerated ? (gapCount ? '⚠ ' + gapCount + ' gap(s)' : 'Ready') : (p.error ? 'Error' : 'Queued');
+    var retryBtn = p.error ? '<button class="regen-btn" style="margin-left:8px;flex-shrink:0;" onclick="event.stopPropagation();retrySinglePage(' + i + ')">Retry</button>' : '';
+    return '<div class="page-row" id="prow-' + i + '" onclick="' + (hasGenerated ? 'openPageViewer(' + i + ')' : '') + '" style="' + (!hasGenerated && !p.error ? 'cursor:default' : '') + '">' +
+      '<div style="flex:1"><div class="pr-name">' + esc(p.name) + '</div><div class="pr-url">' + esc(p.url) + '</div></div>' +
+      '<span class="pr-status ' + statusClass + '" id="pstat-' + i + '">' + statusText + '</span>' +
+      retryBtn +
+      '</div>';
   }).join('');
 }
 
@@ -913,8 +926,10 @@ async function generateAllPages() {
       document.getElementById('pstat-' + i).className = 'pr-status ' + (gapCount ? 's-gap' : 's-done');
       document.getElementById('pstat-' + i).textContent = gapCount ? '⚠ ' + gapCount + ' gap(s)' : 'Ready';
     } catch (e) {
+      S.pages[i].error = true;
+      S.pages[i].generated = null;
       document.getElementById('pstat-' + i).className = 'pr-status s-err';
-      document.getElementById('pstat-' + i).textContent = 'Error';
+      document.getElementById('pstat-' + i).innerHTML = 'Error&nbsp;<button class="regen-btn" onclick="event.stopPropagation();retrySinglePage(' + i + ')">Retry</button>';
     }
   }
   document.getElementById('progressFill').style.width = '100%';
@@ -1100,6 +1115,89 @@ async function submitRegen() {
   } catch (e) { alert('Regeneration failed: ' + e.message); }
   btn.disabled = false;
   btn.textContent = 'Regenerate';
+}
+
+// ─── RETRY SINGLE PAGE ────────────────────────────────────────────────────────
+async function retrySinglePage(i) {
+  var page = S.pages[i];
+  S.pages[i].error = false;
+  var statEl = document.getElementById('pstat-' + i);
+  if (statEl) { statEl.className = 'pr-status s-g'; statEl.innerHTML = '<span class="spinner"></span>'; }
+  var rowEl = document.getElementById('prow-' + i);
+  if (rowEl) {
+    // Remove retry button from row
+    var retryBtn = rowEl.querySelector('.regen-btn');
+    if (retryBtn) retryBtn.remove();
+  }
+  document.getElementById('genNotice').textContent = 'Retrying ' + page.name + '...';
+  try {
+    var result = await api('POST', '/api/generate', {
+      page: page,
+      clientData: S.parsedData,
+      sitemapPages: S.sitemap.pages
+    });
+    S.pages[i].generated = result;
+    S.pages[i].error = false;
+    var gapCount = result.gapFlags ? result.gapFlags.length : 0;
+    if (statEl) { statEl.className = 'pr-status ' + (gapCount ? 's-gap' : 's-done'); statEl.textContent = gapCount ? '⚠ ' + gapCount + ' gap(s)' : 'Ready'; }
+    // Make row clickable again
+    if (rowEl) rowEl.onclick = function() { openPageViewer(i); };
+    // Save updated pages
+    await api('PUT', '/api/projects/' + S.currentProject.id, { pages: S.pages, gapReport: buildGapReport() });
+    document.getElementById('genNotice').textContent = 'Retry successful for ' + page.name + '.';
+  } catch(e) {
+    S.pages[i].error = true;
+    if (statEl) { statEl.className = 'pr-status s-err'; statEl.innerHTML = 'Error&nbsp;<button class="regen-btn" onclick="event.stopPropagation();retrySinglePage(' + i + ')">Retry</button>'; }
+    document.getElementById('genNotice').textContent = 'Retry failed for ' + page.name + '. Try again or check your connection.';
+  }
+}
+
+// ─── UPLOAD REVISED SITEMAP ───────────────────────────────────────────────────
+async function uploadRevisedSitemap(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var text = await file.text();
+  var pages = [];
+  var lines = text.split('
+');
+  var num = 0;
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    // Match lines like: "1. Home (/)"  or  "1. CO2 Laser Birmingham (/co2-laser-birmingham/)"
+    var match = line.match(/^(\d+)\.\s+(.+?)\s+\(([^)]+)\)\s*$/);
+    if (match) {
+      num++;
+      var name = match[2].trim();
+      var url = match[3].trim();
+      // Try to read type from next line
+      var type = 'service';
+      if (i + 1 < lines.length) {
+        var typeLine = lines[i+1].trim();
+        var typeMatch = typeLine.match(/Type:\s*(\w+)/i);
+        if (typeMatch) type = typeMatch[1].toLowerCase();
+      }
+      // Try to read rationale from line after type
+      var rationale = '';
+      if (i + 2 < lines.length) {
+        var ratLine = lines[i+2].trim();
+        var ratMatch = ratLine.match(/Rationale:\s*(.+)/i);
+        if (ratMatch) rationale = ratMatch[1].trim();
+      }
+      pages.push({ number: num, name: name, url: url, type: type, rationale: rationale });
+    }
+  }
+  if (pages.length === 0) {
+    alert('Could not parse the sitemap file. Make sure you are uploading a sitemap downloaded from this tool.');
+    input.value = '';
+    return;
+  }
+  // Merge into existing sitemap
+  S.sitemap.pages = pages;
+  renderSitemap(S.sitemap);
+  await api('PUT', '/api/projects/' + S.currentProject.id, { sitemap: S.sitemap });
+  input.value = '';
+  // Show confirmation in subtitle
+  document.getElementById('sitemapSubtitle').textContent = pages.length + ' pages loaded from uploaded file. Click any cell to edit.';
 }
 
 // ─── GAP REPORT ───────────────────────────────────────────────────────────────
