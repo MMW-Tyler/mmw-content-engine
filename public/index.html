@@ -235,6 +235,10 @@ a { color: var(--accent); text-decoration: none; }
     <button class="btn btn-sm" id="logoutBtn" style="display:none" onclick="logout()">Sign out</button>
   </div>
 </div>
+<div id="sessionNotice" style="display:none;background:#fef3c7;border-bottom:1px solid #fcd34d;padding:10px 24px;align-items:center;justify-content:space-between;gap:12px;">
+  <span style="font-size:13px;color:#b45309;font-weight:500;">Your session expired. Your work is saved — sign in again to continue.</span>
+  <button class="btn btn-sm" onclick="softReLogin()" style="border-color:#fcd34d;color:#b45309;">Sign in again</button>
+</div>
 
 <div class="main">
 
@@ -363,6 +367,7 @@ a { color: var(--accent); text-decoration: none; }
                   Upload revised .txt
                   <input type="file" accept=".txt" style="display:none" onchange="uploadRevisedSitemap(this)">
                 </label>
+                <button class="btn btn-sm" onclick="downloadSitemapDocx(this)">Download proposal .docx</button>
                 <button class="btn btn-primary btn-sm" onclick="approveAndGenerate()">Approve and generate copy</button>
               </div>
             </div>
@@ -543,6 +548,28 @@ async function doLogin() {
   btn.textContent = 'Sign in';
 }
 
+// ─── SOFT RE-LOGIN (session expired without losing state) ─────────────────────
+function softReLogin() {
+  // Show a mini re-auth prompt overlaid on current screen
+  var email = S.userEmail || '';
+  var pwd = prompt('Session expired. Enter your password to continue (your work is saved).\n\nEmail: ' + email);
+  if (!pwd) return;
+  fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email, password: pwd })
+  }).then(function(res) { return res.json(); }).then(function(data) {
+    if (data.token) {
+      S.token = data.token;
+      localStorage.setItem('mmw_token', S.token);
+      var notice = document.getElementById('sessionNotice');
+      if (notice) notice.style.display = 'none';
+    } else {
+      alert('Sign in failed: ' + (data.error || 'Unknown error'));
+    }
+  }).catch(function(e) { alert('Sign in failed: ' + e.message); });
+}
+
 function showLoggedIn() {
   document.getElementById('userBadge').textContent = S.userEmail;
   document.getElementById('logoutBtn').style.display = 'block';
@@ -566,6 +593,11 @@ async function api(method, path, body) {
   };
   if (body) opts.body = JSON.stringify(body);
   var res = await fetch(path, opts);
+  if (res.status === 401) {
+    var notice = document.getElementById('sessionNotice');
+    if (notice) notice.style.display = 'flex';
+    throw new Error('Session expired — please sign in again. Your work is saved.');
+  }
   var data = await res.json();
   if (!res.ok) throw new Error(data.error || 'API error');
   return data;
@@ -881,6 +913,32 @@ function exportSitemap() {
   dl(lines.join('\n'), (S.parsedData.practiceName || 'client').replace(/\s+/g, '_') + '_sitemap.txt');
 }
 
+async function downloadSitemapDocx(btn) {
+  syncSitemapEdits();
+  if (!S.sitemap) return;
+  btn.disabled = true;
+  btn.textContent = 'Building...';
+  try {
+    var res = await fetch('/api/export/sitemap', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + S.token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sitemap: S.sitemap,
+        clientName: S.parsedData.practiceName || 'Client',
+        clientLocation: S.parsedData.primaryLocation || ''
+      })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    var blob = await res.blob();
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (S.parsedData.practiceName || 'client').replace(/\s+/g, '_') + '_Sitemap_Proposal.docx';
+    a.click();
+  } catch(e) { alert('Export failed: ' + e.message); }
+  btn.disabled = false;
+  btn.textContent = 'Download proposal .docx';
+}
+
 // ─── GENERATION ───────────────────────────────────────────────────────────────
 async function approveAndGenerate() {
   syncSitemapEdits();
@@ -897,14 +955,26 @@ function renderPagesList() {
     var hasGenerated = p.generated != null;
     var gapCount = hasGenerated && p.generated.gapFlags ? p.generated.gapFlags.length : 0;
     var statusClass = hasGenerated ? (gapCount ? 's-gap' : 's-done') : (p.error ? 's-err' : 's-q');
-    var statusText = hasGenerated ? (gapCount ? '⚠ ' + gapCount + ' gap(s)' : 'Ready') : (p.error ? 'Error' : 'Queued');
-    var retryBtn = p.error ? '<button class="regen-btn" style="margin-left:8px;flex-shrink:0;" onclick="event.stopPropagation();retrySinglePage(' + i + ')">Retry</button>' : '';
-    return '<div class="page-row" id="prow-' + i + '" onclick="' + (hasGenerated ? 'openPageViewer(' + i + ')' : '') + '" style="' + (!hasGenerated && !p.error ? 'cursor:default' : '') + '">' +
+    var statusText = hasGenerated ? (gapCount ? '\u26a0 ' + gapCount + ' gap(s)' : 'Ready') : (p.error ? 'Error' : 'Queued');
+    var retryBtn = p.error ? '<button class="regen-btn" style="margin-left:8px;flex-shrink:0;" id="retry-' + i + '">Retry</button>' : '';
+    return '<div class="page-row" id="prow-' + i + '" style="cursor:' + (hasGenerated ? 'pointer' : (p.error ? 'default' : 'default')) + '">' +
       '<div style="flex:1"><div class="pr-name">' + esc(p.name) + '</div><div class="pr-url">' + esc(p.url) + '</div></div>' +
       '<span class="pr-status ' + statusClass + '" id="pstat-' + i + '">' + statusText + '</span>' +
       retryBtn +
       '</div>';
   }).join('');
+  // Wire click handlers after DOM is built
+  S.pages.forEach(function(p, i) {
+    var row = document.getElementById('prow-' + i);
+    if (p.generated && row) {
+      row.style.cursor = 'pointer';
+      row.onclick = (function(idx) { return function() { openPageViewer(idx); }; })(i);
+    }
+    var retryBtn = document.getElementById('retry-' + i);
+    if (retryBtn) {
+      retryBtn.onclick = (function(idx) { return function(e) { e.stopPropagation(); retrySinglePage(idx); }; })(i);
+    }
+  });
 }
 
 async function generateAllPages() {
@@ -925,6 +995,12 @@ async function generateAllPages() {
       var gapCount = result.gapFlags ? result.gapFlags.length : 0;
       document.getElementById('pstat-' + i).className = 'pr-status ' + (gapCount ? 's-gap' : 's-done');
       document.getElementById('pstat-' + i).textContent = gapCount ? '⚠ ' + gapCount + ' gap(s)' : 'Ready';
+      // Make row clickable now that it has content
+      var completedRow = document.getElementById('prow-' + i);
+      if (completedRow) {
+        completedRow.style.cursor = 'pointer';
+        completedRow.onclick = (function(idx) { return function() { openPageViewer(idx); }; })(i);
+      }
     } catch (e) {
       S.pages[i].error = true;
       S.pages[i].generated = null;
@@ -1158,8 +1234,7 @@ async function uploadRevisedSitemap(input) {
   if (!file) return;
   var text = await file.text();
   var pages = [];
-  var lines = text.split('
-');
+  var lines = text.split('\n');
   var num = 0;
   for (var i = 0; i < lines.length; i++) {
     var line = lines[i].trim();
