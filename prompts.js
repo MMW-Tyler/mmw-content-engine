@@ -123,6 +123,8 @@ Return ONLY a valid JSON object. No markdown, no backticks, no preamble.
   ],
   "faqSchema": [{"q": "", "a": ""}],
   "seoNotes": "",
+  "focusKeyword": "",
+  "supportingKeywords": [],
   "gapFlags": [{"section": "", "missing": "", "blocksPublish": false, "requestLanguage": ""}]
 }
 
@@ -158,12 +160,24 @@ ${feedback ? `FEEDBACK / SPECIAL INSTRUCTIONS:\n${feedback}\n` : ''}
 Return this structure:
 {
   "pages": [
-    {"number": 1, "name": "", "url": "", "type": "core|service|support", "rationale": ""}
+    {
+      "number": 1,
+      "name": "",
+      "url": "",
+      "type": "core|service|support",
+      "rationale": "",
+      "focusKeyword": "",
+      "supportingKeywords": []
+    }
   ],
   "additionalPages": [
-    {"priority": 1, "name": "", "url": "", "type": "", "value": "high|medium|low", "rationale": ""}
+    {"priority": 1, "name": "", "url": "", "type": "", "value": "high|medium|low", "rationale": "", "focusKeyword": "", "supportingKeywords": []}
   ]
 }
+
+KEYWORD RULES:
+- focusKeyword: the single primary keyword this page should rank for. Format: service + city (e.g. 'bioidentical hormone therapy Batavia IL'). This is the RankMath focus keyword.
+- supportingKeywords: 2-4 long-tail variations and related search phrases (e.g. 'BHRT doctor near me', 'hormone pellet therapy Batavia', 'menopause specialist Kane County'). These inform the content but should never be forced unnaturally into copy.
 
 Generate exactly ${pageCount || 10} core pages. Then up to 8 additional pages as upsell opportunities. For large sites (over 30 pages), focus additional pages on the highest-value service and location combinations.`;
 
@@ -238,6 +252,8 @@ function buildPageBrief(page, clientData, sitemapPages) {
 PAGE: ${page.name}
 URL: ${page.url}
 TYPE: ${page.type}
+FOCUS KEYWORD: ${page.focusKeyword || ''}
+SUPPORTING KEYWORDS: ${(page.supportingKeywords || []).join(', ') || 'none specified'}
 
 CLIENT PROFILE:
 - Practice name: ${d.practiceName || '[GAP: practice name missing]'}

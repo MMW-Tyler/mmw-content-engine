@@ -295,7 +295,7 @@ a { color: var(--accent); text-decoration: none; }
       <div class="stage-bar">
         <div class="stage-pill active" id="pill-1" onclick="goToStage(1)">1. Upload</div>
         <div class="stage-pill" id="pill-2" onclick="goToStage(2)">2. Review data</div>
-        <div class="stage-pill" id="pill-3" onclick="goToStage(3)">3. Sitemap</div>
+        <div class="stage-pill" id="pill-3" onclick="goToStage(3);if(S.sitemap)renderSitemap(S.sitemap);">3. Sitemap</div>
         <div class="stage-pill" id="pill-4" onclick="goToStage(4)">4. Generate copy</div>
         <div class="stage-pill" id="pill-5" onclick="goToStage(5)">5. Export</div>
       </div>
@@ -372,7 +372,7 @@ a { color: var(--accent); text-decoration: none; }
               </div>
             </div>
             <table class="sitemap-table" style="margin-top:14px">
-              <thead><tr><th style="width:32px"></th><th style="width:28px">#</th><th>Page name</th><th>URL</th><th style="width:90px">Type</th><th>Rationale</th><th style="width:36px"></th></tr></thead>
+              <thead><tr><th style="width:28px"></th><th style="width:24px">#</th><th>Page name</th><th>URL</th><th style="width:80px">Type</th><th>Focus keyword</th><th>Supporting keywords</th><th>Rationale</th><th style="width:32px"></th></tr></thead>
               <tbody id="sitemapBody"></tbody>
             </table>
 
@@ -389,6 +389,9 @@ a { color: var(--accent); text-decoration: none; }
       <div id="stage-4" style="display:none">
         <div class="notice notice-info" id="genNotice">Pages generate one at a time. Click any completed page to preview.</div>
         <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+        <div style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+          <button class="btn btn-sm" onclick="manualSaveProject(this)" title="Manually save all generated pages to your project">Save project</button>
+        </div>
 
         <div style="display:flex;gap:16px;flex-wrap:wrap;">
           <div style="flex:0 0 260px;">
@@ -665,16 +668,18 @@ async function openProject(id) {
     document.getElementById('wfStatus').textContent = project.build_type + ' build';
     showScreen('workflow');
     // Resume at the furthest stage completed
+    // Always pre-render sitemap and parsed data so stage pills work correctly
+    if (S.parsedData) renderParsedData(S.parsedData);
+    if (S.sitemap) renderSitemap(S.sitemap);
+
     if (S.pages && S.pages.length > 0) {
       restoreStage(4);
       renderPagesList();
       renderExportGrid();
     } else if (S.sitemap) {
       restoreStage(3);
-      renderSitemap(S.sitemap);
     } else if (S.parsedData) {
       restoreStage(2);
-      renderParsedData(S.parsedData);
     } else {
       goToStage(1);
     }
@@ -826,7 +831,10 @@ function syncSitemapEdits() {
     if (S.sitemap.pages[idx]) {
       S.sitemap.pages[idx].name = cells[0] ? cells[0].textContent.trim() : S.sitemap.pages[idx].name;
       S.sitemap.pages[idx].url = cells[1] ? cells[1].textContent.trim() : S.sitemap.pages[idx].url;
-      S.sitemap.pages[idx].rationale = cells[2] ? cells[2].textContent.trim() : S.sitemap.pages[idx].rationale;
+      S.sitemap.pages[idx].focusKeyword = cells[2] ? cells[2].textContent.trim() : (S.sitemap.pages[idx].focusKeyword || '');
+      var kwRaw = cells[3] ? cells[3].textContent.trim() : '';
+      S.sitemap.pages[idx].supportingKeywords = kwRaw ? kwRaw.split(',').map(function(k){return k.trim();}).filter(Boolean) : (S.sitemap.pages[idx].supportingKeywords || []);
+      S.sitemap.pages[idx].rationale = cells[4] ? cells[4].textContent.trim() : S.sitemap.pages[idx].rationale;
       var sel = row.querySelector('select');
       if (sel) S.sitemap.pages[idx].type = sel.value;
     }
@@ -837,19 +845,27 @@ function syncSitemapEdits() {
 
 function renderSitemap(sitemap) {
   document.getElementById('sitemapTitle').textContent = 'Sitemap — ' + (S.parsedData.practiceName || 'Client');
-  document.getElementById('sitemapSubtitle').textContent = sitemap.pages.length + '-page build. Click any cell to edit directly.';
-  document.getElementById('sitemapBody').innerHTML = (sitemap.pages || []).map(function (p, i) {
-    return '<tr data-idx="' + i + '">' +
-      '<td style="cursor:grab;color:var(--muted2);text-align:center">=</td>' +
+  document.getElementById('sitemapSubtitle').textContent = sitemap.pages.length + '-page build. Drag rows to reorder. Click any cell to edit.';
+  var tbody = document.getElementById('sitemapBody');
+  tbody.innerHTML = (sitemap.pages || []).map(function (p, i) {
+    return '<tr data-idx="' + i + '" draggable="true" ' +
+      'ondragstart="sitemapDragStart(event,' + i + ')" ' +
+      'ondragover="sitemapDragOver(event)" ' +
+      'ondrop="sitemapDrop(event,' + i + ')" ' +
+      'ondragend="sitemapDragEnd(event)" ' +
+      'style="transition:opacity 0.15s">' +
+      '<td style="cursor:grab;color:var(--muted2);text-align:center;user-select:none" title="Drag to reorder">⠿</td>' +
       '<td style="color:var(--muted2);font-size:12px">' + (i+1) + '</td>' +
-      '<td contenteditable="true" style="font-weight:500;min-width:140px" onblur="syncSitemapEdits()">' + esc(p.name) + '</td>' +
-      '<td contenteditable="true" style="font-family:monospace;font-size:12px;min-width:160px" onblur="syncSitemapEdits()">' + esc(p.url) + '</td>' +
-      '<td><select onchange="syncSitemapEdits()" style="font-size:12px;border:1px solid var(--border);border-radius:4px;padding:2px 4px;background:var(--surface)">' +
+      '<td contenteditable="true" style="font-weight:500;min-width:130px" onblur="syncSitemapEdits()">' + esc(p.name) + '</td>' +
+      '<td contenteditable="true" style="font-family:monospace;font-size:11px;min-width:140px" onblur="syncSitemapEdits()">' + esc(p.url) + '</td>' +
+      '<td><select onchange="syncSitemapEdits()" style="font-size:11px;border:1px solid var(--border);border-radius:4px;padding:2px 4px;background:var(--surface)">' +
         '<option value="core"' + (p.type==='core'?' selected':'') + '>core</option>' +
         '<option value="service"' + (p.type==='service'?' selected':'') + '>service</option>' +
         '<option value="support"' + (p.type==='support'?' selected':'') + '>support</option>' +
       '</select></td>' +
-      '<td contenteditable="true" style="font-size:12px;color:var(--muted)" onblur="syncSitemapEdits()">' + esc(p.rationale || '') + '</td>' +
+      '<td contenteditable="true" style="font-size:11px;min-width:110px" onblur="syncSitemapEdits()">' + esc(p.focusKeyword || '') + '</td>' +
+      '<td contenteditable="true" style="font-size:11px;color:var(--muted);min-width:140px" onblur="syncSitemapEdits()">' + esc((p.supportingKeywords||[]).join(', ')) + '</td>' +
+      '<td contenteditable="true" style="font-size:11px;color:var(--muted)" onblur="syncSitemapEdits()">' + esc(p.rationale || '') + '</td>' +
       '<td><button onclick="deleteSitemapRow(' + i + ')" style="background:none;border:none;cursor:pointer;color:var(--muted2);font-size:16px;padding:2px 6px;" title="Remove">×</button></td>' +
       '</tr>';
   }).join('');
@@ -861,6 +877,43 @@ function renderSitemap(sitemap) {
       '<td style="font-size:12px;color:var(--muted)">' + esc(p.rationale || '') + '</td>' +
       '<td><button onclick="promoteAdditionalPage(' + p.priority + ')" class="btn btn-sm" style="font-size:11px;padding:2px 8px;">Add to sitemap</button></td></tr>';
   }).join('');
+  initSitemapDrag();
+}
+
+// ── Drag and drop ─────────────────────────────────────────────────────────────
+var _dragIdx = null;
+function sitemapDragStart(e, idx) {
+  _dragIdx = idx;
+  e.dataTransfer.effectAllowed = 'move';
+  e.currentTarget.style.opacity = '0.45';
+}
+function sitemapDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+}
+function sitemapDrop(e, targetIdx) {
+  e.preventDefault();
+  if (_dragIdx === null || _dragIdx === targetIdx) return;
+  syncSitemapEdits();
+  var moved = S.sitemap.pages.splice(_dragIdx, 1)[0];
+  S.sitemap.pages.splice(targetIdx, 0, moved);
+  S.sitemap.pages.forEach(function(p, i) { p.number = i + 1; });
+  _dragIdx = null;
+  renderSitemap(S.sitemap);
+}
+function sitemapDragEnd(e) {
+  e.currentTarget.style.opacity = '';
+  _dragIdx = null;
+}
+function initSitemapDrag() {
+  // Prevent contenteditable cells from triggering drag
+  document.querySelectorAll('#sitemapBody td[contenteditable]').forEach(function(td) {
+    td.addEventListener('mousedown', function(e) { e.currentTarget.closest('tr').draggable = false; });
+    td.addEventListener('blur', function(e) {
+      var tr = e.currentTarget.closest('tr');
+      if (tr) setTimeout(function() { tr.draggable = true; }, 0);
+    });
+  });
 }
 
 function deleteSitemapRow(idx) {
@@ -1018,8 +1071,49 @@ async function generateAllPages() {
       gapReport: gapReport,
       status: 'in_progress'
     });
-  } catch (e) { console.error('Save failed:', e); }
+    document.getElementById('genNotice').textContent = 'All pages generated and saved.';
+    document.getElementById('genNotice').className = 'notice notice-ok';
+  } catch (e) {
+    console.error('Save failed:', e);
+    document.getElementById('genNotice').textContent = 'Generation complete but SAVE FAILED: ' + e.message + ' — do not close this tab. Try clicking any page then regenerating a section to force a re-save.';
+    document.getElementById('genNotice').className = 'notice notice-warn';
+  }
   renderExportGrid();
+}
+
+// ─── MANUAL SAVE ─────────────────────────────────────────────────────────────
+async function manualSaveProject(btn) {
+  if (!S.currentProject) return;
+  var orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  try {
+    var gapReport = buildGapReport();
+    await api('PUT', '/api/projects/' + S.currentProject.id, {
+      pages: S.pages,
+      gapReport: gapReport,
+      sitemap: S.sitemap,
+      parsedData: S.parsedData,
+      status: 'in_progress'
+    });
+    btn.textContent = 'Saved';
+    btn.style.color = 'var(--success)';
+    btn.style.borderColor = 'var(--success)';
+    setTimeout(function() {
+      btn.textContent = orig;
+      btn.style.color = '';
+      btn.style.borderColor = '';
+      btn.disabled = false;
+    }, 2000);
+  } catch(e) {
+    btn.textContent = 'Save failed: ' + e.message;
+    btn.style.color = 'var(--danger)';
+    setTimeout(function() {
+      btn.textContent = orig;
+      btn.style.color = '';
+      btn.disabled = false;
+    }, 4000);
+  }
 }
 
 // ─── PAGE VIEWER ──────────────────────────────────────────────────────────────
@@ -1128,7 +1222,19 @@ function renderFAQTab(c) {
 }
 
 function renderSEOTab(c) {
+  var kwBlock = '';
+  if (c.focusKeyword || (c.supportingKeywords && c.supportingKeywords.length)) {
+    kwBlock = '<div class="seo-row" style="background:var(--accent-bg);border-radius:var(--radius);padding:10px 12px;margin-bottom:10px;">' +
+      '<div class="seo-key" style="color:var(--accent)">RankMath focus keyword</div>' +
+      '<div class="seo-val" style="font-weight:500;font-size:14px;color:var(--accent)">' + esc(c.focusKeyword || '—') + '</div>' +
+      (c.supportingKeywords && c.supportingKeywords.length ?
+        '<div class="seo-key" style="margin-top:8px;color:var(--accent)">Supporting / longtail keywords</div>' +
+        '<div class="seo-val">' + c.supportingKeywords.map(function(k){ return '<span style="display:inline-block;background:white;border:1px solid var(--border2);border-radius:12px;padding:2px 10px;font-size:12px;margin:2px 4px 2px 0">' + esc(k) + '</span>'; }).join('') + '</div>'
+        : '') +
+      '</div>';
+  }
   document.getElementById('vtab-seo').innerHTML =
+    kwBlock +
     seoRow('Page title', c.pageTitle) +
     seoRow('Meta description', c.metaDescription) +
     seoRow('H1', c.h1) +
@@ -1214,10 +1320,11 @@ async function retrySinglePage(i) {
     });
     S.pages[i].generated = result;
     S.pages[i].error = false;
+    delete S.pages[i].error;
     var gapCount = result.gapFlags ? result.gapFlags.length : 0;
     if (statEl) { statEl.className = 'pr-status ' + (gapCount ? 's-gap' : 's-done'); statEl.textContent = gapCount ? '⚠ ' + gapCount + ' gap(s)' : 'Ready'; }
     // Make row clickable again
-    if (rowEl) rowEl.onclick = function() { openPageViewer(i); };
+    if (rowEl) { rowEl.style.cursor = 'pointer'; rowEl.onclick = (function(idx) { return function() { openPageViewer(idx); }; })(i); }
     // Save updated pages
     await api('PUT', '/api/projects/' + S.currentProject.id, { pages: S.pages, gapReport: buildGapReport() });
     document.getElementById('genNotice').textContent = 'Retry successful for ' + page.name + '.';

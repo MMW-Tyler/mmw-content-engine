@@ -53,7 +53,15 @@ var supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 function readBody(req) {
   return new Promise(function (resolve, reject) {
     var chunks = [];
-    req.on('data', function (c) { chunks.push(c); });
+    var totalSize = 0;
+    var MAX_BYTES = 50 * 1024 * 1024; // 50MB — handles large builds
+    req.on('data', function (c) {
+      chunks.push(c);
+      totalSize += c.length;
+      if (totalSize > MAX_BYTES) {
+        reject(new Error('Request body too large (max 50MB)'));
+      }
+    });
     req.on('end', function () { resolve(Buffer.concat(chunks)); });
     req.on('error', reject);
   });
@@ -796,6 +804,30 @@ function buildPageChildren(pageData, clientName) {
   }
 
   // ── SEO Notes ────────────────────────────────────────────────────────────────
+  if (c.focusKeyword || (c.supportingKeywords && c.supportingKeywords.length)) {
+    children.push(makeSectionBanner('Target Keywords', C.blueLight, C.blue));
+    children.push(new Paragraph({
+      shading: shaded(C.bluePale),
+      spacing: { before: 0, after: 0 },
+      indent: { left: 160, right: 160 },
+      children: [
+        new TextRun({ text: 'RankMath focus keyword:  ', font: 'Arial', size: 20, bold: true, color: C.blue }),
+        new TextRun({ text: c.focusKeyword || '—', font: 'Arial', size: 22, bold: true, color: C.navy })
+      ]
+    }));
+    if (c.supportingKeywords && c.supportingKeywords.length) {
+      children.push(new Paragraph({
+        shading: shaded(C.bluePale),
+        spacing: { before: 0, after: 80 },
+        indent: { left: 160, right: 160 },
+        children: [
+          new TextRun({ text: 'Supporting keywords:  ', font: 'Arial', size: 20, bold: true, color: C.blue }),
+          new TextRun({ text: c.supportingKeywords.join('  |  '), font: 'Arial', size: 20, color: C.gray })
+        ]
+      }));
+    }
+    children.push(sp());
+  }
   if (c.seoNotes) {
     children.push(makeSectionBanner('SEO Notes', C.bluePale, C.blue));
     children.push(makeBodyText(c.seoNotes));
