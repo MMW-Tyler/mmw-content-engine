@@ -342,14 +342,21 @@ var server = http.createServer(async function (req, res) {
 
       var result = await callAnthropic({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
+        max_tokens: 4000,
         system: SITEMAP_SYSTEM,
         messages: [{ role: 'user', content: SITEMAP_USER(clientData, body.pageCount, body.feedback) }]
       });
 
       if (result.status !== 200) return jsonErr(res, result.status, result.body.error?.message || 'API error');
 
-      var sitemap = JSON.parse(cleanJSON(result.body.content[0].text));
+      var raw = cleanJSON(result.body.content[0].text);
+      var sitemap;
+      try {
+        sitemap = JSON.parse(raw);
+      } catch(parseErr) {
+        console.error('Sitemap JSON parse failed. Raw output:', raw.substring(0, 500));
+        return jsonErr(res, 500, 'Sitemap generation returned invalid JSON. The model may have exceeded token limit or returned incomplete data. Try again.');
+      }
       json200(res, sitemap);
     } catch (e) { jsonErr(res, 500, e.message); }
     return;

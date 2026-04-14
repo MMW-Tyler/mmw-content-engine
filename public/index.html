@@ -798,6 +798,9 @@ async function proceedToSitemap() {
   } catch (e) {
     status.style.color = 'var(--danger)';
     status.textContent = 'Error: ' + e.message;
+    console.error('Sitemap generation error:', e);
+    btn.disabled = false;
+    return;
   }
   btn.disabled = false;
   status.innerHTML = '';
