@@ -424,9 +424,10 @@ a { color: var(--accent); text-decoration: none; }
         <div class="card">
           <div class="card-title">Export</div>
           <div class="card-sub">Each file includes layout map, copy sections, SEO metadata, AEO blocks, FAQ schema, and gap flags.</div>
-          <div style="display:flex;gap:10px;margin-bottom:20px;">
+          <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
             <button class="btn btn-primary" onclick="downloadFullPackage()">Download full package (.docx)</button>
             <button class="btn" onclick="downloadGapReport()">Download gap report</button>
+            <button class="btn" onclick="downloadSitemapDocx(this)" id="exportSitemapBtn">Download sitemap (.docx)</button>
           </div>
           <div class="dl-grid" id="dlGrid"></div>
         </div>
@@ -1422,13 +1423,14 @@ async function downloadPage(i) {
     var res = await fetch('/api/export/page', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + S.token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ page: page.generated, clientName: S.parsedData.practiceName || 'Client' })
+      body: JSON.stringify({ page: page.generated, pageNumber: page.number || (i + 1), pageName: page.name })
     });
     if (!res.ok) throw new Error(await res.text());
     var blob = await res.blob();
     var a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = (S.parsedData.practiceName || 'client').replace(/\s+/g,'_') + '_' + (page.name || 'page').replace(/\s+/g,'_') + '.docx';
+    var pageNum = String(page.number || (i + 1)).padStart(2, '0');
+    a.download = pageNum + '_' + (page.name || 'page').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_') + '.docx';
     a.click();
   } catch(e) { alert('Export failed: ' + e.message); }
   btn.disabled = false;

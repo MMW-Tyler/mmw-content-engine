@@ -75,7 +75,7 @@ When information is missing use exactly:
 === LAYOUT PATTERNS ===
 
 Each section must have a "pattern" field. Use these names:
-- hero: Full-width hero with headline, subheadline, body, primary + secondary CTA
+- hero: Full-width hero with a local SEO-optimized H1 headline and a short subheadline (1-2 sentences maximum). NO body copy in the hero — it must be tight and scannable. Primary + secondary CTA only.
 - intro_text: Single column prose block
 - two_col_text: Two column layout (heading/intro left, body right)
 - icon_grid: Grid of 3-6 items each with heading and 1-2 sentence description
@@ -204,7 +204,7 @@ function buildPageBrief(page, clientData, sitemapPages) {
 
   if (isHome) {
     layoutGuide = `RECOMMENDED LAYOUT SECTIONS:
-1. Hero — value proposition, who the provider is, primary + secondary CTA
+1. Hero — local SEO-optimized H1 with primary keyword + city. Subheadline: 1-2 sentences max conveying value proposition and who the provider is. NO body copy. Primary + secondary CTA.
 2. Trust/intro — solo or multi-provider advantage, what makes this practice different
 3. Signature treatments spotlight — top 3 priority services with real substance
 4. Full services overview — organized by category, scannable
@@ -232,7 +232,7 @@ function buildPageBrief(page, clientData, sitemapPages) {
   } else {
     // Service page
     layoutGuide = `RECOMMENDED LAYOUT SECTIONS (service page formula):
-1. Hero — service name + city + value prop
+1. Hero — H1 with service name + city (local SEO keyword). Subheadline: 1-2 sentences max. NO body copy. Primary CTA.
 2. What is this treatment — patient problem, biology, mechanism
 3. Who is a good candidate
 4. What to expect — process, timeline, realistic outcomes
@@ -354,6 +354,10 @@ Use null for unknown values. Use "GAP: [description]" for clearly needed but mis
 // ─── SECTION REGENERATION PROMPT ─────────────────────────────────────────────
 
 function buildRegenerationBrief(section, feedback, pageContext, clientData) {
+  const heroNote = section.pattern === 'hero'
+    ? '\nHERO RULES (non-negotiable): The hero section must contain ONLY an H1 headline (local SEO-optimized with primary keyword + city) and a subheadline of 1-2 sentences maximum. Do NOT write body copy in the hero. Leave the body field empty or omit it entirely.\n'
+    : '';
+
   return `Regenerate this single page section with the feedback provided.
 
 SECTION TO REGENERATE:
@@ -361,7 +365,7 @@ ${JSON.stringify(section, null, 2)}
 
 FEEDBACK FROM REVIEWER:
 ${feedback || 'No specific feedback — improve quality and depth while maintaining voice.'}
-
+${heroNote}
 PAGE CONTEXT:
 - Page: ${pageContext.pageName}
 - URL: ${pageContext.url}

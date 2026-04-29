@@ -409,7 +409,9 @@ var server = http.createServer(async function (req, res) {
     try {
       var body = JSON.parse((await readBody(req)).toString());
       var buffer = await buildPageDocx(body.page, body.clientName);
-      var filename = (body.page.pageName || 'page').replace(/[^a-zA-Z0-9]/g, '_').replace(/_+/g, '_') + '.docx';
+      var pageNum = String(body.pageNumber || 1).padStart(2, '0');
+      var safeName = (body.pageName || body.page.pageName || 'page').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
+      var filename = pageNum + '_' + safeName + '.docx';
       res.writeHead(200, {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'Content-Disposition': 'attachment; filename="' + filename + '"',
