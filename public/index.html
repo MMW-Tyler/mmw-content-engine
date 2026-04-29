@@ -253,7 +253,7 @@ a { color: var(--accent); text-decoration: none; }
 
 .status-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 3px 10px; border-radius: 100px; font-weight: 500; margin-top: 10px; }
 .status-pill::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: 0.7; }
-.status-in_progress { background: var(--accent-bg); color: var(--green-mid); border: 1px solid var(--border); }
+.status-in_progress { background: var(--amber-light); color: #92400E; border: 1px solid var(--amber-border); }
 .status-complete { background: var(--success-bg); color: var(--success); border: 1px solid var(--border); }
 
 .new-project-card {
@@ -1017,7 +1017,7 @@ function renderProjects(projects) {
     var date = new Date(p.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     return '<div class="project-card" onclick="openProject(\'' + p.id + '\')" style="position:relative">' +
       '<div class="project-card-name">' + esc(p.client_name) + '</div>' +
-      '<div class="project-card-meta">' + esc(p.build_type) + ' &nbsp;·&nbsp; Updated ' + date + '</div>' +
+      '<div class="project-card-meta">' + (p.build_type === 'rebuild' ? 'Rebuild / Redesign' : 'New Build') + ' &nbsp;·&nbsp; Updated ' + date + '</div>' +
       '<span class="status-pill status-' + p.status + '">' + (p.status === 'complete' ? 'Complete' : 'In progress') + '</span>' +
       '<button onclick="event.stopPropagation();openDeleteModal(\'' + p.id + '\',\'' + p.client_name.replace(/'/g,"\\'") + '\')" ' +
         'style="position:absolute;top:10px;right:10px;background:none;border:none;cursor:pointer;font-size:16px;color:var(--muted2);padding:2px 6px;border-radius:4px;" ' +
