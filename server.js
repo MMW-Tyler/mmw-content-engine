@@ -762,7 +762,7 @@ function buildPageChildren(pageData, clientName) {
   children.push(new Paragraph({
     spacing: { before: 40, after: 80 },
     indent: { left: 160 },
-    children: [new TextRun({ text: 'Sections are listed in the recommended order for the page. Share with your web team as the build blueprint.', font: 'Arial', size: 20, italics: true, color: C.grayMid })]
+    children: [new TextRun({ text: 'Sections are listed in recommended page order.', font: 'Arial', size: 20, italics: true, color: C.grayMid })]
   }));
 
   (c.layout || []).forEach(function (s) {
@@ -790,7 +790,7 @@ function buildPageChildren(pageData, clientName) {
     children.push(new Paragraph({
       spacing: { before: 40, after: 80 },
       indent: { left: 160 },
-      children: [new TextRun({ text: 'These passages are written to be picked up by AI search engines (Google AI Overviews, ChatGPT, Perplexity). Embed them into the relevant page sections as flowing prose — do not format as Q&A.', font: 'Arial', size: 20, italics: true, color: C.grayMid })]
+      children: [new TextRun({ text: 'These passages are written to appear in search engine featured snippets and answer results. Each one should be embedded into the relevant page section as natural flowing prose.', font: 'Arial', size: 20, italics: true, color: C.grayMid })]
     }));
     c.aeoBlocks.forEach(function (b) {
       makeAEOBlock(b.question, b.answer, b.placedInSection).forEach(function(p) { children.push(p); });
@@ -849,7 +849,7 @@ function buildPageChildren(pageData, clientName) {
     children.push(new Paragraph({
       spacing: { before: 40, after: 80 },
       indent: { left: 160 },
-      children: [new TextRun({ text: 'The following information was missing from the client\'s intake form. Items marked BLOCKS PUBLISHING need to be resolved before the page can go live.', font: 'Arial', size: 20, italics: true, color: C.grayMid })]
+      children: [new TextRun({ text: 'The following details were not included in the information provided. These will need to be confirmed before the page goes live.', font: 'Arial', size: 20, italics: true, color: C.grayMid })]
     }));
     c.gapFlags.forEach(function (g) {
       makeGapFlag(g.section, g.missing, g.requestLanguage, g.blocksPublish).forEach(function(p) { children.push(p); });
@@ -887,7 +887,7 @@ async function buildPackageDocx(pages, clientName, sitemap) {
     shading: shaded(C.navy),
     spacing: { before: 0, after: 200 },
     indent: { left: 160 },
-    children: [new TextRun({ text: 'Generated ' + new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }), font: 'Arial', size: 20, color: '6b8cae' })]
+    children: [new TextRun({ text: 'Prepared ' + new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }), font: 'Arial', size: 20, color: '6b8cae' })]
   }));
   allChildren.push(sp());
 
@@ -942,7 +942,7 @@ async function buildPackageDocx(pages, clientName, sitemap) {
       shading: shaded(C.amberLight),
       spacing: { before: 0, after: 120 },
       indent: { left: 160 },
-      children: [new TextRun({ text: 'The items below were missing from the intake information. Please gather these from your client before the site launches. Items marked BLOCKS PUBLISHING must be resolved before that page can go live.', font: 'Arial', size: 21, italics: true, color: C.amber })]
+      children: [new TextRun({ text: 'The following details were not included in the information provided. Please supply these to your account manager before launch. Items marked BLOCKS PUBLISHING must be resolved before that page can go live.', font: 'Arial', size: 21, italics: true, color: C.amber })]
     }));
     allGaps.forEach(function (g) {
       allChildren.push(new Paragraph({
